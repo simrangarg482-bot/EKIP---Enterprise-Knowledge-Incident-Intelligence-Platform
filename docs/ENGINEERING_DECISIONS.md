@@ -4,6 +4,8 @@ Status: **Living document.** Every non-trivial architectural or design decision 
 
 Format per entry: Decision / Reason / Alternatives Considered / Tradeoffs / Date.
 
+Last updated: 2026-07-21
+
 ---
 
 ## 001 — Modular monolith instead of microservices
@@ -42,10 +44,27 @@ Format per entry: Decision / Reason / Alternatives Considered / Tradeoffs / Date
 
 ---
 
+## 003 — `arq` chosen as the job queue library for `ingestion/`
+
+**Decision:** Use `arq` (Redis-backed, asyncio-native) as the job queue library backing the ingestion worker process defined in decision #002.
+
+**Reason:** The rest of the stack (FastAPI, SQLAlchemy async engine, agent orchestration) is asyncio-first. `arq` is built directly on `asyncio`/`redis.asyncio`, so job handlers can `await` the same async DB sessions, HTTP clients, and embedding calls used everywhere else in the codebase without a sync/async boundary or a thread pool bridge. Celery's async support is a layer bolted onto a fundamentally sync/thread-based worker model, which would mean either writing ingestion connectors in a different style than the rest of the app, or paying a translation cost at every call.
+
+**Alternatives considered:**
+- *Celery* — rejected: mature and battle-tested, but its sync-first worker model fights the asyncio-native design used everywhere else in this codebase; would also pull in a heavier dependency (a message broker abstraction layer) for a queue need that Redis alone already satisfies, since Redis is already a dependency per decision #002.
+- *Plain `asyncio` background tasks with a hand-rolled Redis queue* — rejected: `arq` already provides retry/backoff, job status tracking, and a worker CLI that a hand-rolled version would need to reimplement, for no real benefit over an existing, small, well-scoped library.
+
+**Tradeoffs accepted:**
+- `arq` is a smaller, less battle-tested project than Celery — less community tooling (e.g. no direct equivalent to Celery Flower for monitoring) if job-queue debugging needs grow more sophisticated later.
+- Ties the ingestion worker's queue mechanics to Redis specifically (already true per decision #002, so this doesn't add a new dependency, just deepens reliance on the existing one).
+
+**Date:** 2026-07-21
+
+---
+
 ## Open — not yet decided (tracked here so they aren't silently forgotten)
 
-- **Confidence-score formula and threshold** — will be decided empirically once real retrieval data exists; placeholder logic ships first.
-- **Job queue library for `ingestion/`** — leaning `arq` (native asyncio support) over Celery; not yet finalized.
+- **Confidence-score formula and threshold** — will be decided empirically once real retrieval data exists; placeholder logic (default `0.6`, configurable via `Settings.confidence_threshold`) ships first.
 - **Single MCP server vs. multiple (e.g., knowledge tools vs. admin tools)** — leaning single server initially; revisit if the tool count or permission model gets unwieldy.
 
 Each will get its own numbered entry above once decided.
