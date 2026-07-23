@@ -14,7 +14,7 @@ This file is generated once by `alembic init -t async migrations` and then
 hand-edited to point at the project's Base/settings; it is not meant to be
 regenerated after this point, only edited as needed (e.g. if new model
 modules are added and need to be imported below so their tables are visible
-to autogenerate).
+to autogenerate)...
 """
 
 import asyncio

@@ -101,37 +101,6 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
 
     This is the only logging entrypoint other modules should use -- it
     guarantees every log event goes through the same configuration applied
-    by `configure_logging()`, regardless of which module calls it.
+    by `configure_logging()`, regardless of which module calls it...
     """
     return structlog.get_logger(name)
-
-    """app/__init__.py
-app/core/__init__.py
-app/core/auth/__init__.py
-app/core/users/__init__.py
-app/core/incidents/__init__.py
-app/core/audit/__init__.py
-app/agents/__init__.py
-app/agents/retrieval/__init__.py
-app/agents/investigation/__init__.py
-app/agents/postmortem/__init__.py
-app/agents/knowledge_gap/__init__.py
-app/mcp/__init__.py
-app/mcp/servers/__init__.py
-app/mcp/tools/__init__.py
-app/mcp/resources/__init__.py
-app/ingestion/__init__.py
-app/ingestion/connectors/__init__.py
-app/ingestion/processors/__init__.py
-app/ingestion/workers/__init__.py
-app/retrieval/__init__.py
-app/retrieval/interfaces/__init__.py
-app/retrieval/qdrant/__init__.py
-app/retrieval/pgvector/__init__.py
-app/retrieval/ranking/__init__.py
-app/database/__init__.py
-app/database/models/__init__.py
-app/database/migrations/__init__.py
-app/shared/__init__.py
-app/shared/schemas/__init__.py
-app/shared/config/__init__.py"""

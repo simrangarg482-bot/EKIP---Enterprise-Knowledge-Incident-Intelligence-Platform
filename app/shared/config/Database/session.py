@@ -7,7 +7,7 @@ Every module that needs a DB session gets one through `get_db_session`
 (the FastAPI dependency) or `session_scope` (for non-request contexts, e.g.
 arq worker jobs) -- nothing outside this file constructs a session directly.
 This is what keeps session lifecycle (commit/rollback/close) consistent
-regardless of which module is doing the querying.
+regardless of which module is doing the querying...
 
 Cross-module discipline reminder (ARCHITECTURE.md section 2): a session
 created here must never be passed across a module's public interface boundary
