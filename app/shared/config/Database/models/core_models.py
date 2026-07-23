@@ -1,5 +1,4 @@
 """SQLAlchemy models for tables owned by core/.
-
 Owned by: database/ (ARCHITECTURE.md section 3 -- database/ holds every
 table's definition, but per DATABASE_DESIGN.md's ownership convention, only
 core/'s repository.py files are permitted to write to these tables; other
@@ -16,7 +15,6 @@ first Alembic migration, not here.
 
 import uuid
 from datetime import datetime
-
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -30,10 +28,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from app.database.session import Base
-
-
 class User(Base):
     __tablename__ = "users"
 
@@ -83,7 +78,6 @@ class RolePermission(Base):
         UUID(as_uuid=True), ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True
     )
 
-
 class UserRole(Base):
     """Join table: user <-> role. Composite PK, per DATABASE_DESIGN.md."""
 
@@ -95,7 +89,6 @@ class UserRole(Base):
     role_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
     )
-
 
 class Incident(Base):
     __tablename__ = "incidents"
@@ -135,7 +128,6 @@ class Incident(Base):
         back_populates="incident", cascade="all, delete-orphan"
     )
 
-
 class IncidentTimeline(Base):
     __tablename__ = "incident_timeline"
     __table_args__ = (Index("ix_incident_timeline_incident_occurred", "incident_id", "occurred_at"),)
@@ -157,7 +149,6 @@ class IncidentTimeline(Base):
     )
 
     incident: Mapped["Incident"] = relationship(back_populates="timeline")
-
 
 class Postmortem(Base):
     __tablename__ = "postmortems"
@@ -189,8 +180,8 @@ class Postmortem(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-
 class AuditLog(Base):
+    
     """Append-only. No updates, no deletes, ever -- enforced by convention in
     core/audit/'s repository.py (the only module permitted to write here),
     not by anything at the ORM level.
