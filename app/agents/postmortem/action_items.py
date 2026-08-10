@@ -25,6 +25,7 @@ from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 
+from app.agents.llm import log_llm_usage
 from app.core.incidents.schemas import ActionItem
 from app.shared.config.logging import get_logger
 
@@ -60,6 +61,7 @@ async def generate_action_items(
         "than a vague placeholder."
     )
     response = await llm.ainvoke(prompt)
+    log_llm_usage("postmortem", llm, response)
     raw_text = str(response.content).strip()
 
     parsed = _parse_response(raw_text)

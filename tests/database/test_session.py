@@ -1,7 +1,9 @@
-"""Tests for `app.database.session.set_tenant_context` -- Milestone 10's
-RLS session-variable wiring. Exercised against a fake `AsyncSession` that
-just records what it was asked to execute, since a real Postgres connection
-isn't available to this test suite.
+"""Tests for `app.database.session.set_tenant_context` and
+`get_current_role_attributes` -- Milestone 10's RLS session-variable wiring,
+plus the 2026-08 audit "C2" role-verification addition. Exercised against a
+fake `AsyncSession`/connection that just records what it was asked to
+execute (or returns a canned row), since a real Postgres connection isn't
+available to this test suite.
 """
 
 from __future__ import annotations
@@ -10,16 +12,27 @@ import uuid
 
 import pytest
 
-from app.database.session import set_tenant_context
+from app.database.session import get_current_role_attributes, set_tenant_context
 
 
 class _FakeResult:
-    pass
+    def __init__(self, row=None) -> None:
+        self._row = row
+
+    def one(self):
+        return self._row
+
+
+class _FakeRoleRow:
+    def __init__(self, *, rolsuper: bool, rolbypassrls: bool) -> None:
+        self.rolsuper = rolsuper
+        self.rolbypassrls = rolbypassrls
 
 
 class _FakeSession:
-    def __init__(self) -> None:
+    def __init__(self, *, role_row: _FakeRoleRow | None = None) -> None:
         self.executed: list[tuple[str, dict[str, object]]] = []
+        self._role_row = role_row
 
     async def execute(self, statement, params=None):
         # `text(...)` objects stringify back to the SQL they were built
@@ -27,7 +40,7 @@ class _FakeSession:
         # `set_config(...)`, not a literal `SET LOCAL ...` string, and that
         # it was called with bound parameters rather than interpolated ones.
         self.executed.append((str(statement), params or {}))
-        return _FakeResult()
+        return _FakeResult(self._role_row)
 
 
 @pytest.mark.asyncio
@@ -62,3 +75,48 @@ async def test_set_tenant_context_stringifies_the_uuid() -> None:
     _statement, params = session.executed[0]
     assert isinstance(params["org_id"], str)
     assert params["org_id"] == str(organization_id)
+
+
+# --- get_current_role_attributes (2026-08 audit "C2") ------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_current_role_attributes_queries_pg_roles_for_current_user() -> None:
+    session = _FakeSession(role_row=_FakeRoleRow(rolsuper=False, rolbypassrls=False))
+
+    await get_current_role_attributes(session)
+
+    assert len(session.executed) == 1
+    statement, _params = session.executed[0]
+    assert "pg_roles" in statement
+    assert "current_user" in statement
+
+
+@pytest.mark.asyncio
+async def test_get_current_role_attributes_reports_a_safe_role() -> None:
+    session = _FakeSession(role_row=_FakeRoleRow(rolsuper=False, rolbypassrls=False))
+
+    attributes = await get_current_role_attributes(session)
+
+    assert attributes == {"rolsuper": False, "rolbypassrls": False}
+
+
+@pytest.mark.asyncio
+async def test_get_current_role_attributes_reports_a_bypassing_role() -> None:
+    """The exact condition that makes every Milestone 10 RLS policy a
+    silent no-op: a role with `BYPASSRLS` set, even without `SUPERUSER`.
+    """
+    session = _FakeSession(role_row=_FakeRoleRow(rolsuper=False, rolbypassrls=True))
+
+    attributes = await get_current_role_attributes(session)
+
+    assert attributes == {"rolsuper": False, "rolbypassrls": True}
+
+
+@pytest.mark.asyncio
+async def test_get_current_role_attributes_reports_a_superuser_role() -> None:
+    session = _FakeSession(role_row=_FakeRoleRow(rolsuper=True, rolbypassrls=False))
+
+    attributes = await get_current_role_attributes(session)
+
+    assert attributes == {"rolsuper": True, "rolbypassrls": False}

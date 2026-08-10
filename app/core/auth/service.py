@@ -17,13 +17,11 @@ application available to verify it end-to-end, so treat this as
 spec-correct-by-inspection, not battle-tested, until it's actually exercised
 against a real provider.
 
-One piece is still a deliberate placeholder, not a real implementation:
-`_resolve_client_secret` currently treats `SSOConfiguration.client_secret_ref`
-as if it already were the usable secret. The real encryption/decryption
-helper this should call (`shared/security`, PROJECT_PLAN.md section 12.5 --
-envelope encryption via a managed KMS) does not exist yet as a module. This
-is called out loudly in that function's own docstring rather than silently
-treated as done.
+`_resolve_client_secret` decrypts `SSOConfiguration.client_secret_ref` via
+`shared/security`'s envelope-encryption helper (PROJECT_PLAN.md section
+12.5), mirroring `ingestion.service`'s decrypt-immediately-before-use
+handling of connector credentials -- `core.tenancy.service.configure_sso` is
+what encrypts it in the first place, before it is ever persisted.
 
 Group-claim extraction (`_exchange_code_for_claims`'s `groups` field) checks
 the standard `groups` claim, which Entra ID and Okta commonly populate when
@@ -75,6 +73,7 @@ from app.core.users import service as users_service
 from app.database.session import set_tenant_context
 from app.shared.config.logging import get_logger
 from app.shared.config.settings import get_settings
+from app.shared.security import decrypt_secret, get_kms
 
 logger = get_logger(__name__)
 
@@ -237,20 +236,19 @@ async def complete_sso_login(
 
 
 def _resolve_client_secret(client_secret_ref: str) -> str:
-    """Resolve a stored secret *reference* into the actual usable client
-    secret needed for the token exchange.
+    """Resolve a stored, envelope-encrypted secret *reference* into the
+    actual usable client secret needed for the token exchange.
 
-    NOT YET SECURE -- a deliberate, loudly-flagged placeholder, not a design
-    decision: `shared/security`'s envelope-encryption helper (PROJECT_PLAN.md
-    section 12.5 -- a DEK per secret, itself encrypted by a KEK held in a
-    managed KMS) does not exist as a module yet, so this function currently
-    just returns `client_secret_ref` unchanged, as if it were already the
-    plaintext secret. Replace this function's body with a real call into
-    `shared/security` the moment that module exists; nothing about the rest
-    of this file's OIDC flow needs to change when that happens, since this is
-    the only place `client_secret_ref` gets turned into a usable value.
+    `configure_sso` (`core.tenancy.service`) is the sole writer of
+    `SSOConfiguration.client_secret_ref`, and always stores the
+    envelope-encrypted blob (`app.shared.security.encrypt_secret`), never the
+    plaintext value a caller submitted -- mirroring `register_connector`'s
+    handling of connector credentials. This is the one place that value gets
+    decrypted back into a usable secret, immediately before the token
+    exchange needs it (`_exchange_code_for_claims`); it is never logged or
+    persisted anywhere in decrypted form.
     """
-    return client_secret_ref
+    return decrypt_secret(get_kms(), client_secret_ref)
 
 
 async def _exchange_code_for_claims(

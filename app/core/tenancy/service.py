@@ -24,10 +24,13 @@ pattern documented for core/incidents (PROJECT_PLAN.md section 9.4). Seeding
 migration concern, not something this module manages.
 
 Milestone 10 addition (PROJECT_PLAN.md section 12.5): `register_connector`
-now depends on `shared/security` to envelope-encrypt a connector's plaintext
-credential before persisting it -- the first real caller of that module.
-See `register_connector`'s own docstring for the encrypt-at-write/decrypt-
-at-read split with `ingestion.service`.
+depends on `shared/security` to envelope-encrypt a connector's plaintext
+credential before persisting it -- the first real caller of that module. See
+`register_connector`'s own docstring for the encrypt-at-write/decrypt-at-read
+split with `ingestion.service`. `configure_sso` does the same for
+`SSOConfigurationCreate.client_secret_ref` (2026-08 audit "C3" fix), with
+`core.auth.service._resolve_client_secret` as its decrypt-at-read
+counterpart.
 """
 
 from __future__ import annotations
@@ -129,6 +132,18 @@ async def create_organization(
     `slug` column's own uniqueness constraint is the final backstop against
     actually storing a duplicate, it just wouldn't surface as this clean an
     error in that narrow race window).
+
+    Milestone 10 RLS note: `organizations` itself needs no GUC set --
+    deliberately excluded from RLS (see the RLS migration's own docstring;
+    same reasoning `get_organization_sso_config` documents for its own
+    `get_organization_by_slug` lookup). `projects` (and, if `actor` is given,
+    `audit_logs` via `record_audit_event` below) *are* RLS-protected,
+    though, so `set_tenant_context` must be called the moment `org_row.id`
+    is known -- the same "set it immediately once the id is known, before
+    the very next RLS-protected query" pattern `get_organization_sso_config`
+    already follows. `SET LOCAL` scopes this to the current transaction, so
+    setting it once here also covers the later `record_audit_event` write in
+    the same transaction; no second call is needed.
     """
     existing = await repository.get_organization_by_slug(session, data.slug)
     if existing is not None:
@@ -141,6 +156,7 @@ async def create_organization(
     org_row = await repository.insert_organization(
         session, name=data.name, slug=data.slug
     )
+    await set_tenant_context(session, org_row.id)
     await repository.insert_project(
         session, organization_id=org_row.id, name="General", is_default=True
     )
@@ -254,6 +270,15 @@ async def configure_sso(
     existing configuration is a distinct, not-yet-built operation (see
     repository.insert_sso_configuration's docstring), not silently handled
     here as an upsert.
+
+    `data.client_secret_ref` (the plaintext OIDC client secret a caller
+    submits at setup time) is envelope-encrypted (`app.shared.security`,
+    PROJECT_PLAN.md section 12.5) before it is ever persisted -- the same
+    encrypt-at-write pattern `register_connector` already uses for connector
+    credentials, applied here for the first time to SSO secrets. Only the
+    encrypted envelope is stored; `core.auth.service._resolve_client_secret`
+    is the sole place that decrypts it back, immediately before an OIDC
+    token exchange needs it.
     """
     _ensure_same_organization(actor, organization_id)
     require_permission(actor, _MANAGE_PERMISSION)
@@ -268,6 +293,7 @@ async def configure_sso(
             detail={"organization_id": str(organization_id)},
         )
 
+    encrypted_client_secret_ref = encrypt_secret(get_kms(), data.client_secret_ref)
     row = await repository.insert_sso_configuration(
         session,
         organization_id=organization_id,
@@ -275,7 +301,7 @@ async def configure_sso(
         protocol=data.protocol,
         issuer_url=data.issuer_url,
         client_id=data.client_id,
-        client_secret_ref=data.client_secret_ref,
+        client_secret_ref=encrypted_client_secret_ref,
     )
     await record_audit_event(
         session,

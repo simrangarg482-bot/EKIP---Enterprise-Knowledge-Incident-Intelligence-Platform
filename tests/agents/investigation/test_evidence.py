@@ -24,11 +24,12 @@ from app.agents.investigation.evidence import (
     _gather_live_evidence,
     _parse_source_timestamp,
     _should_augment_with_live_evidence,
+    gather_evidence,
 )
 from app.agents.investigation.live.monitoring_live import MonitoringLiveSource
 from app.core.tenancy.schemas import ConnectorConfig
-from app.retrieval.schemas import ScoredChunk
-from app.shared.schemas import EvidenceItem, Identity
+from app.retrieval.schemas import ScoredChunk, SearchFilters
+from app.shared.schemas import ActorKind, EvidenceItem, Identity
 
 
 def _chunk(metadata: dict[str, str], content: str = "some content") -> ScoredChunk:
@@ -318,6 +319,70 @@ async def test_gather_live_evidence_returns_empty_when_list_connectors_fails(mon
     result = await _gather_live_evidence(session=None, query="q", actor=actor, retry_count={})
 
     assert result == []
+
+
+# --- gather_evidence: project-level SearchFilters scoping (2026-08 audit "C1") ---
+
+
+@pytest.mark.asyncio
+async def test_gather_evidence_restricts_search_to_actor_project_memberships(monkeypatch) -> None:
+    """Confirmed-leak regression test: an actor who belongs to Project A
+    only must never have Project B's evidence searched on their behalf,
+    regardless of what org-level permissions they also hold.
+    """
+    organization_id = uuid.uuid4()
+    project_a = uuid.uuid4()
+    project_b = uuid.uuid4()  # the actor has NO membership row for this project
+    actor = Identity(
+        kind=ActorKind.USER,
+        subject=str(uuid.uuid4()),
+        organization_id=organization_id,
+        user_id=uuid.uuid4(),
+        permissions=frozenset({"observability:read"}),
+        project_permissions={project_a: frozenset({"incident:write"})},
+    )
+
+    captured_filters: list[SearchFilters] = []
+
+    async def fake_search(session, query, filters, top_k, *args, **kwargs):
+        captured_filters.append(filters)
+        # Enough chunks to hit `_EVIDENCE_CAP` via code+slack evidence alone,
+        # so postmortem/monitoring/live sources (which need their own,
+        # unrelated mocks) are never reached.
+        return [_chunk({}) for _ in range(5)]
+
+    monkeypatch.setattr(evidence_module.retrieval_service, "search", fake_search)
+
+    await gather_evidence(session=None, query="checkout failing", actor=actor, retry_count={})
+
+    assert captured_filters, "retrieval.service.search was never called"
+    for filters in captured_filters:
+        assert filters.project_ids == [project_a]
+        assert project_b not in (filters.project_ids or [])
+        assert filters.permission_codes == frozenset({"observability:read", "incident:write"})
+
+
+@pytest.mark.asyncio
+async def test_gather_evidence_without_project_memberships_is_unrestricted(monkeypatch) -> None:
+    """Preserves the pre-existing, common-case behavior: an actor with no
+    project-scoped membership rows still searches every project they can
+    see via their org-level permissions.
+    """
+    actor = Identity.for_agent("test_agent", uuid.uuid4())
+
+    captured_filters: list[SearchFilters] = []
+
+    async def fake_search(session, query, filters, top_k, *args, **kwargs):
+        captured_filters.append(filters)
+        return [_chunk({}) for _ in range(5)]
+
+    monkeypatch.setattr(evidence_module.retrieval_service, "search", fake_search)
+
+    await gather_evidence(session=None, query="checkout failing", actor=actor, retry_count={})
+
+    assert captured_filters, "retrieval.service.search was never called"
+    for filters in captured_filters:
+        assert filters.project_ids is None
 
 
 @pytest.mark.asyncio

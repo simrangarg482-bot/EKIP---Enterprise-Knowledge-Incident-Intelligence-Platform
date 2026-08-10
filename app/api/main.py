@@ -23,11 +23,24 @@ projects, SSO configuration, access rules, invitations -- the rest of
 integration-gaps pass that added project-scoped RBAC and logout-everywhere),
 and users (`/users/{user_id}/logout-all` -- the admin-triggered session
 revocation counterpart to `/auth/logout-all`).
+
+**OTel tracing (Advanced Features Roadmap Phase 1, "OTel tracing (2.3)"):**
+`create_app()` calls `app.shared.config.tracing.configure_tracing()` and
+instruments the app with `FastAPIInstrumentor`, giving every request its own
+root span -- the `agent.*` spans `agents.graph`'s nodes create (via
+`agents.tracing.traced_node`) nest underneath it automatically (OTel Python
+propagates the active span via `contextvars`, which `async`/`await`
+preserves across the whole request), so a single request's full span tree
+(HTTP request -> retrieval -> confidence -> answer/investigation) is visible
+in one trace. This module does not call `configure_logging()` -- a
+pre-existing gap (nothing here ever has) left as-is, out of this change's
+scope; `configure_tracing()` has no such dependency on it.
 """
 
 from __future__ import annotations
 
 from fastapi import FastAPI
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from app.api.errors import ekip_error_handler
 from app.api.routers import (
@@ -41,9 +54,12 @@ from app.api.routers import (
     users,
 )
 from app.core.exceptions import EKIPError
+from app.shared.config.tracing import configure_tracing
 
 
 def create_app() -> FastAPI:
+    configure_tracing()
+
     app = FastAPI(title="EKIP API", version="0.1.0")
 
     app.add_exception_handler(EKIPError, ekip_error_handler)
@@ -57,6 +73,8 @@ def create_app() -> FastAPI:
     app.include_router(tenancy.router)
     app.include_router(tenancy.admin_router)
     app.include_router(users.router)
+
+    FastAPIInstrumentor.instrument_app(app)
 
     return app
 

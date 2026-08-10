@@ -154,3 +154,18 @@ forbidden_modules = ["app.mcp", "app.ingestion"]
 # shaped as a FastAPI dependency, so app/api uses it directly (see
 # app/api/deps.py's docstring) rather than through an injected
 # session_factory indirection.
+
+[[tool.importlinter.contracts]]
+name = "evaluation does not depend on mcp or ingestion internals"
+type = "forbidden"
+source_modules = ["app.evaluation"]
+forbidden_modules = ["app.mcp", "app.ingestion"]
+# Mirrors "agents does not depend on mcp or ingestion internals" above:
+# app/evaluation calls app.agents.service.answer_question the same way
+# scripts/CI tooling calls any other agents/ entrypoint, and writes its own
+# eval_runs/eval_case_results tables directly (the same already-established
+# database-leaf exception app.agents/app.ingestion/app.retrieval each carry
+# for their own owned tables -- see app/evaluation/repository.py's module
+# docstring) -- but it has no legitimate reason to reach into mcp/ or
+# ingestion/ internals, the same boundary every other agents-adjacent/
+# transport-adjacent module in this codebase already respects.

@@ -72,15 +72,30 @@ class Settings(BaseSettings):
 
     # --- LLM (AGENT_WORKFLOWS.md; ENGINEERING_DECISIONS.md #008) -----------
     openai_api_key: str = Field(description="Used by all agent LLM calls.")
-    agent_llm_model: str = Field(
+
+    # --- Model routing (Advanced Features Roadmap Phase 1, "Model routing
+    # (2.4)", app/agents/llm.py) -- supersedes the earlier single
+    # `agent_llm_model` setting, which gave every LLM-calling task the same
+    # model with no way to differentiate. Both default to the exact same
+    # value `agent_llm_model` used to, so this change alone does not change
+    # runtime behavior until one is set differently from the other. See
+    # `app.agents.llm`'s module docstring for the full task -> tier table.
+    agent_llm_model_cheap: str = Field(
         default="gpt-4o-mini",
         description=(
-            "OpenAI chat model used by every LLM-calling agent node (query "
-            "rewriting, Answer Agent generation, hypothesis generation). A "
-            "single global setting, not one per node -- no node in "
-            "AGENT_WORKFLOWS.md has a documented reason to use a different "
-            "model than any other yet; split this into per-node settings if "
-            "one ever does."
+            "OpenAI chat model for 'cheap'-tier tasks (query rewriting, "
+            "grounding-check escalation, knowledge-gap topic synthesis, "
+            "evaluation-harness judging) -- short, narrowly-scoped LLM "
+            "calls that don't need the most capable available model."
+        ),
+    )
+    agent_llm_model_capable: str = Field(
+        default="gpt-4o-mini",
+        description=(
+            "OpenAI chat model for 'capable'-tier tasks (Answer Agent "
+            "generation, Investigation Agent hypothesis generation, "
+            "Postmortem Agent root-cause/action-item generation) -- longer, "
+            "more open-ended generation where output quality matters most."
         ),
     )
 
@@ -169,6 +184,54 @@ class Settings(BaseSettings):
             "rate-limiting requirement. Independent of (and in addition to) "
             "each individual connector's own declared `requests_per_second` "
             "ceiling; see `app.ingestion.rate_limiter`'s module docstring."
+        ),
+    )
+    ingestion_job_timeout_seconds: int = Field(
+        default=1800,
+        gt=0,
+        description=(
+            "Single source of truth for how long one ingestion job is "
+            "allowed to run before it's treated as timed out (2026-08 audit "
+            "'H1' fix). Two consumers: `app.ingestion.workers.main."
+            "WorkerSettings.job_timeout` (arq's own outer, hard-kill "
+            "cancellation -- a backstop) and `app.ingestion.service."
+            "_execute_ingestion_job`'s internal `asyncio.wait_for` around "
+            "the fetch loop, which uses a slightly shorter effective value "
+            "so its own, catchable timeout fires first in the normal case, "
+            "leaving a durable 'failed' job record rather than relying on "
+            "arq's outer cancellation (which raises an uncatchable-by-"
+            "`except Exception` `asyncio.CancelledError`)."
+        ),
+    )
+
+    # --- Observability tracing (Advanced Features Roadmap Phase 1, "OTel
+    # tracing (2.3)", app/shared/config/tracing.py) -----------------------
+    otel_enabled: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for OTel tracing (app.shared.config.tracing) -- "
+            "mirrors investigation_live_evidence_enabled's precedent for a "
+            "feature that should be disable-able without a code change."
+        ),
+    )
+    otel_service_name: str = Field(
+        default="ekip",
+        description=(
+            "service.name resource attribute every exported span carries -- "
+            "lets a shared Jaeger/Tempo/Grafana backend distinguish EKIP's "
+            "spans from other services'."
+        ),
+    )
+    otel_exporter_otlp_endpoint: str | None = Field(
+        default=None,
+        description=(
+            "OTLP/HTTP endpoint spans are exported to (e.g. "
+            "http://localhost:4318/v1/traces). Unset (the default) exports to "
+            "stdout via ConsoleSpanExporter instead -- no external collector "
+            "required to see spans locally; set this once a real collector is "
+            "running (Phase 2's Docker/deployment story). Requires the "
+            "'opentelemetry-exporter-otlp-proto-http' package to be installed "
+            "separately -- see app.shared.config.tracing._build_exporter."
         ),
     )
 

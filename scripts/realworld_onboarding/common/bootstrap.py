@@ -73,21 +73,41 @@ from app.database.session import engine, session_scope, set_tenant_context  # no
 ALL_PERMISSION_CODES = [
     "tenancy:manage",
     "incident:write",
+    "incident:read",  # 2026-08 audit "H4"
     "postmortem:write",
     "postmortem:approve",
+    "postmortem:read",  # 2026-08 audit "H4"
     "knowledge:review",
     "observability:read",
 ]
 
 # Five realistic personas, matching the task's requested roster, each with a
 # distinct permission set chosen specifically so permission-matrix testing
-# has real allow/deny contrast between them.
+# has real allow/deny contrast between them. `incident:read`/`postmortem:read`
+# (2026-08 audit "H4") are added here for every persona that could already
+# read incidents/postmortems before that fix (which was every persona except
+# a hypothetical bare zero-permission identity, since the read was previously
+# unconditional) -- this harness's job is to model realistic, already-
+# functioning personas, not to exercise the new gate's deny path (see
+# `tests/core/incidents/test_service.py` for that).
 PERSONAS: dict[str, list[str]] = {
     "admin": list(ALL_PERMISSION_CODES),
-    "security_engineer": ["incident:write", "postmortem:write", "observability:read"],
-    "developer": ["incident:write"],
-    "manager": ["postmortem:approve", "knowledge:review", "observability:read"],
-    "read_only": ["observability:read"],
+    "security_engineer": [
+        "incident:write",
+        "incident:read",
+        "postmortem:write",
+        "postmortem:read",
+        "observability:read",
+    ],
+    "developer": ["incident:write", "incident:read"],
+    "manager": [
+        "postmortem:approve",
+        "postmortem:read",
+        "incident:read",
+        "knowledge:review",
+        "observability:read",
+    ],
+    "read_only": ["observability:read", "incident:read", "postmortem:read"],
 }
 
 

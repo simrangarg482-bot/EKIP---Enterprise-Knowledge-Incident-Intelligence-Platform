@@ -1,0 +1,74 @@
+[
+  {
+    "case_id": "checkout-500-runbook",
+    "question": "How do we usually handle checkout service 500 errors?",
+    "expected_sources": ["runbooks", "slack"],
+    "notes": "Mirrors docs/USER_TESTING_GUIDE.md's own manual-testing example question -- expects the incident-response runbook plus the Slack thread(s) where this was previously discussed."
+  },
+  {
+    "case_id": "checkout-500-cause",
+    "question": "What usually causes checkout 500s?",
+    "expected_sources": ["runbooks", "slack", "github"],
+    "notes": "A recurring-root-cause question -- expects a runbook plus any GitHub issues/commits documenting the actual fix history."
+  },
+  {
+    "case_id": "payment-service-recent-changes",
+    "question": "What changed recently in the payment service?",
+    "expected_sources": ["github"],
+    "notes": "Recency-flavored question -- expects recent commits/PRs, not a static doc."
+  },
+  {
+    "case_id": "checkout-redis-dependency",
+    "question": "Does the checkout service depend on Redis?",
+    "expected_sources": ["github", "confluence"],
+    "notes": "Architecture/dependency question -- expects a service-ownership doc and/or code referencing the Redis client."
+  },
+  {
+    "case_id": "auth-config-location",
+    "question": "Where is the authentication configuration documented?",
+    "expected_sources": ["confluence", "sharepoint"],
+    "notes": "Pure documentation-lookup question, no incident framing -- checks retrieval works for reference material, not just incident Q&A."
+  },
+  {
+    "case_id": "checkout-owner-team",
+    "question": "Which team owns the checkout service?",
+    "expected_sources": ["confluence", "slack"],
+    "notes": "Ownership-lookup question -- a wrong or unconfident answer here is a clear regression signal since ownership info changes rarely."
+  },
+  {
+    "case_id": "similar-checkout-incidents",
+    "question": "Find anything like: checkout returns 500 intermittently.",
+    "expected_sources": ["runbooks", "jira", "slack"],
+    "notes": "Free-text similarity-search-flavored question, mirrors docs/USER_TESTING_GUIDE.md section 7's MCP example."
+  },
+  {
+    "case_id": "deploy-pipeline-retry-behavior",
+    "question": "Does the deploy pipeline retry failed steps automatically?",
+    "expected_sources": ["github", "confluence"],
+    "notes": "Behavioral/how-does-it-work question over engineering documentation and CI config."
+  },
+  {
+    "case_id": "azure-devops-workitem-status",
+    "question": "What is the status of the checkout latency work item in Azure DevOps?",
+    "expected_sources": ["azure_devops"],
+    "notes": "Exercises a source outside Slack/GitHub/Confluence -- the golden set should not skew toward only the most common connectors."
+  },
+  {
+    "case_id": "teams-incident-notification",
+    "question": "How are incident notifications sent to the on-call team?",
+    "expected_sources": ["teams", "confluence"],
+    "notes": "Exercises the Teams connector alongside a documentation source."
+  },
+  {
+    "case_id": "unanswerable-unrelated-topic",
+    "question": "What is our company's parental leave policy?",
+    "expected_sources": [],
+    "notes": "Deliberately out of scope for an engineering-incident knowledge base -- the harness should score a confident NO_ANSWER (or low-confidence investigation routing) as correct, not penalize it. A judge that rewards a confident hallucinated answer here is itself a signal something is wrong."
+  },
+  {
+    "case_id": "jira-ticket-linked-to-incident",
+    "question": "Which Jira ticket tracks the checkout 500 error incident?",
+    "expected_sources": ["jira"],
+    "notes": "Direct ticket-lookup question, expects the Jira connector's ingested content specifically."
+  }
+]

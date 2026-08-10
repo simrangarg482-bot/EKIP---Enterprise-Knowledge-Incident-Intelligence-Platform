@@ -40,11 +40,16 @@ see `_execute_ingestion_job`'s own docstring; (2) every `fetch_batch` call
 acquires from two `app.ingestion.rate_limiter.TokenBucketRateLimiter`
 budgets first (per-connector_config and per-organization), closing the gap
 `app.ingestion.workers.tasks.scheduled_reconciliation`'s docstring used to
-flag as "not attempted here."
+flag as "not attempted here" -- except for a connector that declares
+`rate_limits_own_requests = True` (2026-08 audit "H2" fix,
+`app.ingestion.connectors.base.Connector`'s own docstring), which instead
+acquires per real outbound HTTP request itself, from the same shared
+limiter (`app.ingestion.rate_limiter.get_ingestion_rate_limiter()`).
 """
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -65,7 +70,7 @@ from app.ingestion.connectors.sharepoint import SharePointConnector
 from app.ingestion.connectors.slack import SlackConnector
 from app.ingestion.connectors.teams import TeamsConnector
 from app.ingestion.processors.pipeline import process_document
-from app.ingestion.rate_limiter import TokenBucketRateLimiter
+from app.ingestion.rate_limiter import get_ingestion_rate_limiter
 from app.ingestion.schemas import ContentType, IngestionJob, ResolvedConnectorConfig
 from app.retrieval import service as retrieval_service
 from app.retrieval.schemas import CollectionName, UpsertChunk
@@ -92,10 +97,15 @@ _CONNECTOR_REGISTRY: dict[str, Connector] = {
     RunbooksConnector.source_name: RunbooksConnector(),
 }
 
-# One shared, in-process limiter for every job this worker process runs --
-# see `app.ingestion.rate_limiter`'s module docstring for exactly what this
-# does and does not guarantee (per-process, not cross-process/distributed).
-_rate_limiter = TokenBucketRateLimiter()
+# How much earlier than `Settings.ingestion_job_timeout_seconds` (which also
+# drives arq's own outer `job_timeout`) this module's internal
+# `asyncio.wait_for` fires (2026-08 audit "H1" fix). Deliberately nonzero: if
+# both timeouts were identical, a race between arq's own outer cancellation
+# and this module's internal one could still let arq's raw, uncatchable-by-
+# `except Exception` `asyncio.CancelledError` win. This margin exists purely
+# to make the internal, catchable path win that race in practice, not
+# because the exact number matters.
+_TIMEOUT_SAFETY_MARGIN_SECONDS = 30
 
 # `ProcessedDocument.content_type` -> `retrieval.schemas.CollectionName`
 # (PROJECT_PLAN.md section 8.2's collection names; see
@@ -220,6 +230,47 @@ async def _execute_ingestion_job(
     only "which org owns this connector_config," nothing else; only once
     that's known and `set_tenant_context` is set does the real, RLS-scoped
     `get_connector_config` query below run.
+
+    2026-08 audit "H1" fix -- job lifecycle observability: the `queued` ->
+    `running` transition is committed immediately (`session.commit()`),
+    before the fetch loop starts, rather than only ever being visible once
+    the whole job finishes. Without this, `get_job_status` -- called from a
+    completely different request/session/database connection -- could never
+    see a job that was still running: Postgres's default READ COMMITTED
+    isolation means an uncommitted row is invisible outside the transaction
+    that wrote it, and `repository.insert_ingestion_job`/`update_ingestion_
+    job`'s `session.flush()` only makes a row visible to *further queries on
+    this same session*, never to any other one. This is a deliberate,
+    narrow exception to this module's usual "services don't commit their
+    own session" convention (see `core.audit.service`'s docstring for why
+    that convention exists in the ordinary case) -- required here because
+    "is this job actually running yet" must cross a session/transaction
+    boundary while the fetch loop is still in progress, which no amount of
+    `flush()` can do. Because `set_tenant_context`'s `SET LOCAL` is scoped
+    to the transaction it was called in, and the commit above ends that
+    transaction, `set_tenant_context` is called again immediately
+    afterward, before any further RLS-protected query runs in the new,
+    auto-begun transaction.
+
+    2026-08 audit "H1" fix -- timeout/cancellation durability: the fetch
+    loop runs inside `asyncio.wait_for(..., timeout=...)`, using a value
+    slightly shorter than `Settings.ingestion_job_timeout_seconds` (which
+    also drives arq's own outer `job_timeout`, `app.ingestion.workers.main.
+    WorkerSettings`). This converts the common case of "this job ran too
+    long" from an external `asyncio.CancelledError` raised by arq's outer
+    cancellation -- a `BaseException`, not caught by this function's own
+    `except Exception`, nor by `run_ingestion_job_task`'s, nor by
+    `session_scope`'s, so it used to unwind straight past every one of
+    them and erase the *entire* transaction, including the job row itself
+    -- into an ordinary `asyncio.TimeoutError`, a normal `Exception`
+    subclass this function already knows how to record as `status=
+    "failed"`. A genuine external cancellation (arq's own outer timeout
+    still firing despite the margin above, or a worker shutdown signal) is
+    handled by a dedicated `except asyncio.CancelledError` clause: unlike
+    the ordinary-failure branch, it commits the failure record itself
+    before re-raising, since a `CancelledError` must still propagate
+    (asyncio's own contract), which would otherwise reach `session_scope`'s
+    `finally: session.close()` and discard an uncommitted write.
     """
     organization_id = await repository.resolve_connector_config_organization_id(
         session, connector_config_id
@@ -268,6 +319,18 @@ async def _execute_ingestion_job(
     if job_row is None:
         raise RuntimeError("Ingestion job disappeared mid-update.")  # unreachable: just inserted above
 
+    # H1 fix: commit the running transition now, in its own short
+    # transaction, so a concurrent `get_job_status` call (a different
+    # session/connection) can see it immediately rather than only once this
+    # entire sync finishes -- see this function's own docstring for the
+    # full "services don't normally commit" caveat this deliberately,
+    # narrowly overrides.
+    await session.commit()
+    # The commit above ended the transaction `set_tenant_context` set the
+    # GUC in (`SET LOCAL` is transaction-scoped) -- re-set it for the new,
+    # auto-begun transaction before any further RLS-protected query runs.
+    await set_tenant_context(session, organization_id)
+
     since = None if force_full_sync else config_row.last_synced_at
     documents_processed = 0
     stage = "authenticate"
@@ -279,20 +342,24 @@ async def _execute_ingestion_job(
     connector_supports_resume_token = getattr(connector, "supports_resume_token", False)
     resume_token_in = config_row.config.get("_resume_token") if connector_supports_resume_token else None
     latest_resume_token: str | None = None
-    try:
+    # 2026-08 audit "H2" fix -- see `Connector.rate_limits_own_requests`'s
+    # own docstring (`app.ingestion.connectors.base`).
+    connector_rate_limits_own_requests = getattr(connector, "rate_limits_own_requests", False)
+
+    async def _run_sync() -> None:
         # The fetch/normalize/process/persist loop runs inside a savepoint
         # (a nested transaction), not the outer transaction directly. This
-        # matters because `job_row` was created in the *outer* transaction,
-        # which nothing here ever commits (services never commit their own
-        # session -- see core.audit.service's docstring on why; the caller's
-        # `session_scope()`/`get_db_session` does that). Without the
-        # savepoint, a mid-loop failure would have no clean way to roll back
-        # just the failed attempt's writes: rolling back the *whole*
-        # transaction would also erase `job_row` itself, making the
-        # subsequent "mark this job failed" update impossible to apply.
-        # `begin_nested()` rolls back only its own block on exception,
-        # leaving `job_row` (and the session generally) intact and usable
-        # in the `except` clause below.
+        # matters because `job_row`'s "running" transition was committed
+        # separately above, which nothing here ever commits again (services
+        # don't commit their own session -- see core.audit.service's
+        # docstring on why -- except for the one deliberate exception just
+        # above). Without the savepoint, a mid-loop failure would have no
+        # clean way to roll back just the failed attempt's writes: rolling
+        # back the *whole* transaction would also erase this attempt's
+        # ability to record why it failed. `begin_nested()` rolls back only
+        # its own block on exception, leaving `job_row` (and the session
+        # generally) intact and usable in the `except` clauses below.
+        nonlocal client, documents_processed, latest_resume_token, stage
         async with session.begin_nested():
             client = await connector.authenticate(resolved_config)
             cursor: str | None = None
@@ -302,13 +369,22 @@ async def _execute_ingestion_job(
                 # (PROJECT_PLAN.md sections 4.5/10: "per connector, per
                 # tenant") -- see `app.ingestion.rate_limiter`'s module
                 # docstring for why both are needed and what each is for.
-                await _rate_limiter.acquire(
-                    f"connector:{connector_config_id}", connector.requests_per_second
-                )
-                await _rate_limiter.acquire(
-                    f"org:{config_row.organization_id}",
-                    get_settings().ingestion_org_max_requests_per_second,
-                )
+                #
+                # Skipped for a connector that acquires its own tokens per
+                # real outbound HTTP request instead (2026-08 audit "H2"
+                # fix, `Connector.rate_limits_own_requests` -- `JiraConnector`
+                # is the one example so far): acquiring here too would be a
+                # redundant, extra token consumed on top of what that
+                # connector already acquires internally for the exact same
+                # shared buckets.
+                if not connector_rate_limits_own_requests:
+                    await get_ingestion_rate_limiter().acquire(
+                        f"connector:{connector_config_id}", connector.requests_per_second
+                    )
+                    await get_ingestion_rate_limiter().acquire(
+                        f"org:{config_row.organization_id}",
+                        get_settings().ingestion_org_max_requests_per_second,
+                    )
                 fetch_kwargs: dict[str, Any] = {"since": since, "cursor": cursor}
                 if connector_supports_resume_token:
                     fetch_kwargs["resume_token"] = resume_token_in
@@ -330,6 +406,19 @@ async def _execute_ingestion_job(
                     break
                 cursor = fetch_result.next_cursor
 
+    try:
+        # H1 fix: bounded by a timeout slightly shorter than arq's own
+        # outer `job_timeout` (see this function's docstring and
+        # `_TIMEOUT_SAFETY_MARGIN_SECONDS`'s own comment) -- converts the
+        # common "this job ran too long" case into an ordinary, catchable
+        # `asyncio.TimeoutError` (handled by the `except Exception` clause
+        # below, via `_is_timeout`) instead of relying on arq's outer,
+        # uncatchable-by-`except Exception` `asyncio.CancelledError`.
+        fetch_timeout_seconds = max(
+            get_settings().ingestion_job_timeout_seconds - _TIMEOUT_SAFETY_MARGIN_SECONDS, 1
+        )
+        await asyncio.wait_for(_run_sync(), timeout=fetch_timeout_seconds)
+
         completed_at = datetime.now(timezone.utc)
         job_row = await repository.update_ingestion_job(
             session,
@@ -349,13 +438,60 @@ async def _execute_ingestion_job(
             if latest_resume_token is not None
             else None,
         )
+    except asyncio.CancelledError:
+        # H1 fix: a genuine *external* cancellation (arq's own outer
+        # `job_timeout` still firing despite `_TIMEOUT_SAFETY_MARGIN_
+        # SECONDS`, or a worker shutdown signal) rather than this
+        # function's own internal `asyncio.wait_for` timeout (that raises
+        # `asyncio.TimeoutError`, an ordinary `Exception` handled below,
+        # not this). Unlike the `except Exception` branch, this commits the
+        # failure record itself, right here, before re-raising --
+        # `CancelledError` must still propagate (asyncio's own contract: a
+        # task that swallows cancellation without re-raising leaves the
+        # caller unable to tell the difference between "finished" and "was
+        # cancelled"), and letting it reach `session_scope`'s `finally:
+        # session.close()` uncommitted would discard this exact write, the
+        # same "zero trace" failure mode this whole fix exists to close.
+        logger.warning(
+            "ingestion_job_cancelled",
+            job_id=str(job_row.id),
+            connector_config_id=str(connector_config_id),
+            stage=stage,
+        )
+        job_row = await repository.update_ingestion_job(
+            session,
+            job_row.id,
+            status="failed",
+            failed_stage=f"{stage}:cancelled",
+            completed_at=datetime.now(timezone.utc),
+        )
+        await tenancy_service.update_connector_sync_status(
+            session,
+            actor,
+            config_row.organization_id,
+            connector_config_id,
+            status="error",
+            config_patch={"_resume_token": latest_resume_token}
+            if latest_resume_token is not None
+            else None,
+        )
+        await session.commit()
+        raise
     except Exception as exc:
+        # `asyncio.TimeoutError` (raised by this function's own internal
+        # `asyncio.wait_for` above) is an ordinary `Exception` subclass, so
+        # it lands here rather than in the `CancelledError` clause above --
+        # `_is_timeout` just labels it distinctly (`failed_stage` gets a
+        # ":timeout" suffix) so it's not indistinguishable from any other
+        # mid-fetch failure.
+        _is_timeout = isinstance(exc, asyncio.TimeoutError)
         logger.warning(
             "ingestion_job_failed",
             job_id=str(job_row.id),
             connector_config_id=str(connector_config_id),
             stage=stage,
             error=str(exc),
+            timed_out=_is_timeout,
         )
         # `documents_processed` deliberately NOT reported here: the savepoint
         # above rolled back every document/metadata write this attempt made,
@@ -379,7 +515,7 @@ async def _execute_ingestion_job(
             session,
             job_row.id,
             status="failed",
-            failed_stage=stage,
+            failed_stage=f"{stage}:timeout" if _is_timeout else stage,
             completed_at=datetime.now(timezone.utc),
         )
         await tenancy_service.update_connector_sync_status(

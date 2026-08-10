@@ -160,7 +160,15 @@ async def gather_evidence(
     evidence is worth fetching -- see that function's docstring.
     """
     evidence: list[EvidenceItem] = []
-    filters = SearchFilters(organization_id=actor.organization_id, permission_codes=actor.permissions)
+    # See `Identity.resolve_search_scope`'s docstring: restricts to the
+    # actor's project-scoped memberships when they hold any, otherwise
+    # unrestricted-by-project as before.
+    project_ids, permission_codes = actor.resolve_search_scope()
+    filters = SearchFilters(
+        organization_id=actor.organization_id,
+        project_ids=project_ids,
+        permission_codes=permission_codes,
+    )
 
     evidence.extend(await _gather_code_evidence(session, query, filters, retry_count))
 

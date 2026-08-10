@@ -16,8 +16,10 @@ from arq.cron import cron
 from app.agents.workers.tasks import run_knowledge_gap_detection_task, scheduled_knowledge_gap_scan
 from app.shared.config.logging import configure_logging
 from app.shared.config.settings import get_settings
+from app.shared.config.tracing import configure_tracing
 
 configure_logging()
+configure_tracing()
 
 
 class WorkerSettings:

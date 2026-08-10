@@ -31,12 +31,26 @@ plain Python `float` (matching every other confidence-adjacent value in this
 codebase -- `Settings.confidence_threshold`, `ScoredChunk.score` -- rather
 than a `decimal.Decimal` the rest of the app would need to convert at every
 read site).
+
+`model_used`/`prompt_tokens`/`completion_tokens`/`total_tokens` added by the
+Advanced Features Roadmap Phase 1 "Model routing (2.4)" feature
+(`d8a2f6c1b9e3_advanced_features_phase1_model_routing.py`) -- the roadmap's
+own text for this item: "log model_used + token counts onto
+agent_executions (the table already exists, just add columns)". All four
+are nullable: a still-`running` row, or a run whose graph raised before any
+LLM call executed, legitimately has none of this data yet (or ever).
+`model_used` is a comma-joined, sorted list of every *distinct* model
+actually used across the run (`app.agents.llm.get_tracked_usage`), not a
+single value -- one `answer_question` run may genuinely route several
+different tasks (query rewrite, generation, grounding-check) to different
+models, and collapsing that to one string would misrepresent which model(s)
+did the work.
 """
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Numeric, Text, func, text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -79,6 +93,12 @@ class AgentExecution(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # --- Model routing (Advanced Features Roadmap Phase 1, "Model routing
+    # (2.4)") -- see module docstring above.
+    model_used: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class KnowledgeGapReport(Base):

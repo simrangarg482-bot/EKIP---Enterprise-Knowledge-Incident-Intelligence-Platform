@@ -32,6 +32,7 @@ from app.shared.config.settings import get_settings
 from app.database.models import agent_models  # noqa: F401
 from app.database.models import auth_models  # noqa: F401
 from app.database.models import core_models  # noqa: F401
+from app.database.models import evaluation_models  # noqa: F401
 from app.database.models import ingestion_models  # noqa: F401
 from app.database.models import retrieval_models  # noqa: F401
 from app.database.models import tenancy_models  # noqa: F401

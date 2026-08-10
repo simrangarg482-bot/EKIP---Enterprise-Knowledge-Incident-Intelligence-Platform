@@ -21,6 +21,8 @@ from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 
+from app.agents.llm import log_llm_usage
+
 _NO_CANDIDATE_TEXT = "(none -- no prior Investigation Agent hypothesis exists for this incident)"
 
 
@@ -70,5 +72,6 @@ async def extract_root_cause(
         "the available timeline; manual review required.'"
     )
     response = await llm.ainvoke(prompt)
+    log_llm_usage("postmortem", llm, response)
     root_cause = str(response.content).strip()
     return root_cause

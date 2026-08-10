@@ -66,6 +66,19 @@ logger = get_logger(__name__)
 _INCIDENT_WRITE_PERMISSION = "incident:write"
 _POSTMORTEM_WRITE_PERMISSION = "postmortem:write"
 _POSTMORTEM_APPROVE_PERMISSION = "postmortem:approve"
+# 2026-08 audit "H4" fix: `get_incident`/`list_incidents`/`get_timeline`/
+# `get_postmortem` previously checked only same-organization membership
+# (`_ensure_same_organization`) -- any identity with zero role assignments at
+# all (a real, supported state; see `core.users.service.resolve_identity`'s
+# own docstring) could still read every incident/postmortem in the org,
+# including sensitive root-cause/evidence detail. `observability:read`/
+# `knowledge:review` already gate other read surfaces in this codebase --
+# these two codes close the one resource group that was missing that
+# pattern. See migration `b6e9c2a4f7d1` for why introducing these as a new
+# mandatory gate does not lock out any already-provisioned identity: it
+# backfills both codes onto every existing role first.
+_INCIDENT_READ_PERMISSION = "incident:read"
+_POSTMORTEM_READ_PERMISSION = "postmortem:read"
 
 
 def _ensure_same_organization(actor: Identity, organization_id: uuid.UUID) -> None:
@@ -183,9 +196,17 @@ async def get_incident(
 ) -> Incident:
     """Fetch one incident. Raises NotFoundError if it doesn't exist (or
     belongs to a different organization).
+
+    2026-08 audit "H4" fix: gated by `incident:read`, project-scoped to the
+    incident's own `project_id` -- the same "fetch the owned row first, then
+    check permission against its project" ordering `update_incident` already
+    uses for the write-side gate, so a project-scoped grant (or the absence
+    of one, falling back to the org-level set) is honored identically for
+    reads and writes.
     """
     _ensure_same_organization(actor, organization_id)
     row = await _get_owned_incident(session, organization_id, incident_id)
+    require_project_permission(actor, row.project_id, _INCIDENT_READ_PERMISSION)
     return Incident.model_validate(row)
 
 
@@ -194,8 +215,18 @@ async def list_incidents(
 ) -> list[Incident]:
     """Return incidents belonging to `organization_id`, filtered/paginated
     per `query` (API_DESIGN.md: `GET /incidents`).
+
+    2026-08 audit "H4" fix: gated by `incident:read` at the org level, not
+    project-scoped -- `IncidentFilter` has no `project_id` field (this
+    endpoint has always listed across every project in the organization at
+    once, with no existing per-project restriction to preserve), so there is
+    no single project to check a project-scoped grant against, matching the
+    same org-level-only pattern `agents.service.list_gap_reports`/
+    `get_agent_execution_stats` already use for their own "list everything in
+    my org" reads.
     """
     _ensure_same_organization(actor, organization_id)
+    require_permission(actor, _INCIDENT_READ_PERMISSION)
     rows = await repository.list_incidents(session, organization_id, query)
     return [Incident.model_validate(row) for row in rows]
 
@@ -290,9 +321,18 @@ async def add_timeline_note(
 async def get_timeline(
     session: AsyncSession, actor: Identity, organization_id: uuid.UUID, incident_id: uuid.UUID
 ) -> list[TimelineEntry]:
-    """Return an incident's timeline, in chronological order."""
+    """Return an incident's timeline, in chronological order.
+
+    2026-08 audit "H4" fix: gated by `incident:read`, project-scoped to the
+    incident's own `project_id` -- a timeline can carry Investigation Agent
+    evidence/hypotheses (`record_investigation_result`) alongside human
+    notes, at least as sensitive as the incident row itself, so it is gated
+    identically rather than left as a second, ungated way to reach
+    equivalent information.
+    """
     _ensure_same_organization(actor, organization_id)
-    await _get_owned_incident(session, organization_id, incident_id)
+    incident = await _get_owned_incident(session, organization_id, incident_id)
+    require_project_permission(actor, incident.project_id, _INCIDENT_READ_PERMISSION)
 
     rows = await repository.list_timeline_entries(session, incident_id)
     return [TimelineEntry.model_validate(row) for row in rows]
@@ -501,9 +541,21 @@ async def trigger_postmortem_generation(
 async def get_postmortem(
     session: AsyncSession, actor: Identity, organization_id: uuid.UUID, postmortem_id: uuid.UUID
 ) -> Postmortem:
-    """Fetch one postmortem (draft or published)."""
+    """Fetch one postmortem (draft or published).
+
+    2026-08 audit "H4" fix: gated by `postmortem:read`, project-scoped via
+    the postmortem's owning incident's `project_id` -- the same "resolve the
+    owning incident to find the project to check against" pattern
+    `update_postmortem`/`approve_postmortem` already use for their own
+    write-side gates. A postmortem's root-cause/evidence detail is at least
+    as sensitive as the incident it documents, so it is gated rather than
+    left as a second, ungated way to reach equivalent information.
+    """
     _ensure_same_organization(actor, organization_id)
     row = await _get_owned_postmortem(session, organization_id, postmortem_id)
+    incident = await repository.get_incident_by_id(session, row.incident_id)
+    project_id = incident.project_id if incident is not None else None
+    require_permission(actor, _POSTMORTEM_READ_PERMISSION, project_id=project_id)
     return Postmortem.model_validate(row)
 
 

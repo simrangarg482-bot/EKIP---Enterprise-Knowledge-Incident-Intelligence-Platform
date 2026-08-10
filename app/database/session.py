@@ -23,6 +23,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
@@ -166,6 +167,34 @@ async def set_tenant_context(session: AsyncSession, organization_id: uuid.UUID) 
         text("SELECT set_config(:guc_name, :org_id, true)"),
         {"guc_name": _TENANT_GUC_NAME, "org_id": str(organization_id)},
     )
+
+
+async def get_current_role_attributes(
+    session: "AsyncSession | AsyncConnection",
+) -> dict[str, bool]:
+    """Return the connected role's `rolsuper`/`rolbypassrls` attributes --
+    the two Postgres role attributes that make every Milestone 10 RLS policy
+    a silent no-op regardless of `FORCE ROW LEVEL SECURITY` (see the RLS
+    migration's own docstring's superuser warning, and Postgres's rule that
+    both attributes override `FORCE` unconditionally, checked before the
+    policy is even consulted).
+
+    2026-08 audit "C2": this project's `DATABASE_URL` has, in every
+    environment observed so far, connected as `neondb_owner` -- Neon's
+    default database-owner role -- which `FORCE ROW LEVEL SECURITY` alone
+    does not neutralize unless that role also happens to carry `BYPASSRLS`.
+    This function is what `scripts/verify_rls_enforcement.py` calls to check
+    the *actually-configured* connection's role directly, rather than
+    inferring an answer from the connection string's username. See
+    `app.database.migrations.versions.f4a7c2e9b3d1_provision_rls_respecting_app_role`
+    for the dedicated, non-superuser/non-bypassrls role this project
+    provisions once this is confirmed.
+    """
+    result = await session.execute(
+        text("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user")
+    )
+    row = result.one()
+    return {"rolsuper": bool(row.rolsuper), "rolbypassrls": bool(row.rolbypassrls)}
 
 
 @asynccontextmanager

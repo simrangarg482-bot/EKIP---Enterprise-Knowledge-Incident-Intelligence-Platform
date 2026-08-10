@@ -69,14 +69,19 @@ def make_retrieval_agent_node(
             retry_count=state.retry_count,
         )
 
-        # project_ids left at its default (None = "every project in the
-        # organization"): Identity.project_permissions has no populated
-        # resolution path yet (ENGINEERING_DECISIONS.md #004's flagged gap),
-        # so there is nothing narrower to filter by today -- inherited from
-        # that gap, not a new one introduced here.
+        # project_ids/permission_codes resolved from the actor's own
+        # project-scoped grants (Identity.resolve_search_scope) rather than
+        # left at "every project in the organization": a caller with no
+        # project-scoped membership still searches unrestricted by project
+        # (the org-level-only common case), but a caller who does hold one
+        # or more project memberships is restricted to exactly those
+        # projects, closing the cross-project leak an org-level permission
+        # alone used to allow.
+        project_ids, permission_codes = state.actor.resolve_search_scope()
         filters = SearchFilters(
             organization_id=state.actor.organization_id,
-            permission_codes=state.actor.permissions,
+            project_ids=project_ids,
+            permission_codes=permission_codes,
         )
 
         try:

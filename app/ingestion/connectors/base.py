@@ -59,6 +59,21 @@ class Connector(Protocol):
     #: to resume their Graph delta walks from where the last sync left off
     #: instead of re-walking from scratch every time.
     supports_resume_token: bool = False
+    #: Opt-out (2026-08 audit "H2" fix): whether this connector acquires its
+    #: own rate-limiter tokens per real outbound HTTP request, rather than
+    #: relying on `ingestion.service._execute_ingestion_job`'s generic
+    #: acquisition of one token per `fetch_batch()` call. Defaults to
+    #: `False` so every connector written before this flag existed is
+    #: unaffected. A connector whose `fetch_batch` can make many real HTTP
+    #: requests per call (`JiraConnector`'s search-then-per-issue-
+    #: description-and-comment shape is the one example so far) sets this
+    #: `True` and calls `app.ingestion.rate_limiter.
+    #: get_ingestion_rate_limiter().acquire(...)` itself, once per real
+    #: request, using the same `"connector:{connector_config_id}"`/
+    #: `"org:{organization_id}"` key shapes the generic path uses -- see
+    #: `app.ingestion.rate_limiter`'s module docstring for why this is a
+    #: per-connector opt-out rather than instrumenting every connector.
+    rate_limits_own_requests: bool = False
 
     async def authenticate(self, config: ResolvedConnectorConfig) -> AuthenticatedClient:
         """Build an authenticated client for this source from `config`.

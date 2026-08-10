@@ -78,6 +78,93 @@ async def test_search_similar_incidents_scopes_filters_to_actor_org(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_search_similar_incidents_restricts_to_actor_project_memberships(
+    monkeypatch,
+) -> None:
+    """Confirmed-leak regression test (2026-08 audit "C1"): an actor who
+    belongs to Project A only must not be able to pull Project B's evidence
+    through `search_similar_incidents`.
+    """
+    captured: dict[str, object] = {}
+
+    async def fake_search(session, query, filters, top_k, *args, **kwargs):
+        captured["filters"] = filters
+        return [_chunk()]
+
+    monkeypatch.setattr(agents_service.retrieval_service, "search", fake_search)
+
+    organization_id = uuid.uuid4()
+    project_a = uuid.uuid4()
+    project_b = uuid.uuid4()  # no membership row -- must never be searched
+    actor = Identity(
+        kind=ActorKind.USER,
+        subject=str(uuid.uuid4()),
+        organization_id=organization_id,
+        user_id=uuid.uuid4(),
+        project_permissions={project_a: frozenset({"incident:write"})},
+    )
+
+    await agents_service.search_similar_incidents(None, "checkout failing", actor)
+
+    filters = captured["filters"]
+    assert isinstance(filters, SearchFilters)
+    assert filters.project_ids == [project_a]
+    assert project_b not in (filters.project_ids or [])
+
+
+@pytest.mark.asyncio
+async def test_search_similar_incidents_without_project_memberships_is_unrestricted(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_search(session, query, filters, top_k, *args, **kwargs):
+        captured["filters"] = filters
+        return [_chunk()]
+
+    monkeypatch.setattr(agents_service.retrieval_service, "search", fake_search)
+
+    actor = Identity.for_agent("test_agent", uuid.uuid4())
+    await agents_service.search_similar_incidents(None, "checkout failing", actor)
+
+    filters = captured["filters"]
+    assert isinstance(filters, SearchFilters)
+    assert filters.project_ids is None
+
+
+@pytest.mark.asyncio
+async def test_search_recent_changes_restricts_to_actor_project_memberships(monkeypatch) -> None:
+    """Same confirmed-leak scenario as `search_similar_incidents`, for
+    `search_recent_changes`.
+    """
+    captured: dict[str, object] = {}
+
+    async def fake_search(session, query, filters, top_k, collection=None, *, include_metadata=False):
+        captured["filters"] = filters
+        return [_chunk()]
+
+    monkeypatch.setattr(agents_service.retrieval_service, "search", fake_search)
+
+    organization_id = uuid.uuid4()
+    project_a = uuid.uuid4()
+    project_b = uuid.uuid4()
+    actor = Identity(
+        kind=ActorKind.USER,
+        subject=str(uuid.uuid4()),
+        organization_id=organization_id,
+        user_id=uuid.uuid4(),
+        project_permissions={project_a: frozenset({"incident:write"})},
+    )
+
+    await agents_service.search_recent_changes(None, "checkout", actor)
+
+    filters = captured["filters"]
+    assert isinstance(filters, SearchFilters)
+    assert filters.project_ids == [project_a]
+    assert project_b not in (filters.project_ids or [])
+
+
+@pytest.mark.asyncio
 async def test_search_recent_changes_searches_code_collection_with_metadata(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

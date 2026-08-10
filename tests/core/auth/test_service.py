@@ -18,6 +18,7 @@ import pytest
 from app.core.auth import service as auth_service
 from app.core.auth.schemas import RefreshRequest, SessionTokens
 from app.core.exceptions import PermissionDeniedError
+from app.shared.security import encrypt_secret, get_kms
 
 
 class _FakeRefreshTokenRow:
@@ -181,3 +182,39 @@ async def test_revoke_all_sessions_scopes_by_user_and_organization(monkeypatch) 
     assert captured["user_id"] == user_id
     assert captured["organization_id"] == organization_id
     assert captured["revoked_at"] is not None
+
+
+# --- _resolve_client_secret (2026-08 audit "C3") -----------------------------
+
+
+def test_resolve_client_secret_decrypts_a_real_envelope() -> None:
+    """Confirmed bug fix: `_resolve_client_secret` used to return
+    `client_secret_ref` unchanged, treating it as if it were already the
+    plaintext secret. `core.tenancy.service.configure_sso` now always
+    stores an envelope-encrypted blob (`app.shared.security.encrypt_secret`)
+    there -- this proves the round trip actually works, using the real KMS
+    envelope helpers (the same ones `configure_sso` itself calls), not a
+    mock standing in for them.
+    """
+    plaintext_secret = "super-secret-oidc-client-secret"
+    encrypted = encrypt_secret(get_kms(), plaintext_secret)
+
+    # The stored value must not itself be (or contain) the plaintext --
+    # otherwise this "encryption" would be decorative.
+    assert encrypted != plaintext_secret
+    assert plaintext_secret not in encrypted
+
+    resolved = auth_service._resolve_client_secret(encrypted)
+
+    assert resolved == plaintext_secret
+
+
+def test_resolve_client_secret_rejects_a_plaintext_value_that_is_not_an_envelope() -> None:
+    """Guards against silently regressing back to "treat client_secret_ref
+    as already-plaintext": a raw, non-JSON string (what every
+    `SSOConfiguration.client_secret_ref` looked like before this fix) must
+    fail loudly (the same discipline `decrypt_secret`'s own docstring
+    describes), not be quietly accepted as a usable secret.
+    """
+    with pytest.raises(Exception):
+        auth_service._resolve_client_secret("this-is-not-an-encrypted-envelope")

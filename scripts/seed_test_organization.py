@@ -44,8 +44,10 @@ from app.core.users import service as users_service
 from app.database.models.core_models import Permission, Role, RolePermission
 from app.database.session import session_scope, set_tenant_context
 from app.shared.config.logging import configure_logging
+from app.shared.config.tracing import configure_tracing
 
 configure_logging()
+configure_tracing()
 
 # Every permission code actually checked anywhere in the app today (grep for
 # `require_permission(actor, "...")` / `_..._PERMISSION = "..."` across app/).
@@ -54,8 +56,10 @@ configure_logging()
 _ALL_PERMISSION_CODES = [
     "tenancy:manage",
     "incident:write",
+    "incident:read",  # 2026-08 audit "H4"
     "postmortem:write",
     "postmortem:approve",
+    "postmortem:read",  # 2026-08 audit "H4"
     "knowledge:review",
     "observability:read",
 ]

@@ -24,13 +24,15 @@ Secrets discipline (PROJECT_PLAN.md section 12.5): `client_secret_ref` and
 encrypted secret store, never a usable raw credential -- core/tenancy stores
 and returns only the reference, consistent with its "must never do the
 actual OAuth handshake" boundary (PROJECT_PLAN.md section 9.2). It is
-therefore safe for these read models to include them. The one deliberate
-exception is `ConnectorConfigCreate.credential_ref` (below) -- a caller
-registering a new connector still submits the *plaintext* credential once,
-at setup time; `core.tenancy.service.register_connector` envelope-encrypts
-it (`app.shared.security`) before it is ever persisted, so by the time it
-comes back out through `ConnectorConfig.credential_ref` it is the encrypted
-envelope, not what was submitted.
+therefore safe for these read models to include them. The two deliberate
+exceptions are `ConnectorConfigCreate.credential_ref` and
+`SSOConfigurationCreate.client_secret_ref` (below) -- a caller registering a
+new connector or configuring SSO still submits the *plaintext*
+credential/secret once, at setup time; `core.tenancy.service.
+register_connector`/`configure_sso` envelope-encrypt it (`app.shared.
+security`) before it is ever persisted, so by the time it comes back out
+through `ConnectorConfig.credential_ref`/`SSOConfiguration.client_secret_ref`
+it is the encrypted envelope, not what was submitted.
 
 `AccessRuleCreate`/`InvitationCreate`/`ProvisioningDecision` back the SSO
 provisioning-policy design (ENGINEERING_DECISIONS.md's provisioning-policy
@@ -152,10 +154,15 @@ class SSOConfigurationCreate(BaseModel):
     `protocol` defaults to `"oidc"` and one shape covers all of them; `saml`
     is accepted here as a forward-compatible option for a future SAML-only
     IdP, not because any current provider needs it. `client_secret_ref` is
-    expected to already be a valid reference into the encrypted secret store
-    (PROJECT_PLAN.md section 12.5) -- creating that secret record is a
-    `shared/security` concern, not something this schema or core/tenancy
-    performs.
+    the *plaintext* OIDC client secret as issued by the IdP -- naming it
+    `..._ref` matches `ConnectorConfigCreate.credential_ref`'s naming (both
+    are call-time-plaintext, at-rest-encrypted), not a claim that the caller
+    must already hold a reference into the encrypted secret store.
+    `core.tenancy.service.configure_sso` is what turns this into a real
+    encrypted-at-rest reference (`app.shared.security.encrypt_secret`)
+    before persisting it -- the same encrypt-at-write responsibility
+    `register_connector` already has for `ConnectorConfigCreate.
+    credential_ref`.
     """
 
     provider: SSOProvider

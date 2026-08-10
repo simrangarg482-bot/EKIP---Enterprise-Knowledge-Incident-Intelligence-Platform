@@ -16,9 +16,20 @@ own stated purpose ("the composing layer").
 
 Built as a factory (`make_answer_agent_node`), matching
 `agents.retrieval.node`'s rationale for the same reason -- though this node
-only needs `llm`, not an `AsyncSession`: retrieval and confidence evaluation
-are already done by the time this node runs, and nothing here reads or
-writes the database.
+only needs LLM clients, not an `AsyncSession`: retrieval and confidence
+evaluation are already done by the time this node runs, and nothing here
+reads or writes the database.
+
+**Model routing (Advanced Features Roadmap Phase 1, "Model routing (2.4)"):**
+`make_answer_agent_node` takes *two* separate clients, `generation_llm` and
+`grounding_llm`, rather than one shared `llm` as it did before this feature
+-- this node makes two genuinely distinct LLM calls (`generate_answer`'s
+drafting call vs. `verify_grounding`'s ambiguous-band escalation check), and
+`app.agents.graph.build_graph` now resolves each from its own task
+(`get_llm("generation")` / `get_llm("grounding_check")`), which may
+legitimately differ (see `app.agents.llm`'s module docstring). Passing one
+shared instance for both, the way this node worked before, would silently
+defeat that routing for whichever of the two tasks isn't "generation."
 
 Failure handling per AGENT_WORKFLOWS.md section 2.3: an LLM timeout/rate-
 limit, or an entirely ungrounded draft (every sentence fails verification),
@@ -59,9 +70,14 @@ class _UngroundedAnswerError(Exception):
 
 
 def make_answer_agent_node(
-    llm: BaseChatModel,
+    generation_llm: BaseChatModel,
+    grounding_llm: BaseChatModel,
 ) -> Callable[[GraphState], Awaitable[dict[str, Any]]]:
-    """Build the LangGraph-callable Answer Agent node, bound to `llm`."""
+    """Build the LangGraph-callable Answer Agent node, bound to
+    `generation_llm` (drafting) and `grounding_llm` (grounding-check
+    escalation) -- see module docstring for why these are two separate
+    clients, not one shared `llm`.
+    """
 
     async def node(state: GraphState) -> dict[str, Any]:
         chunks = state.retrieved_chunks
@@ -78,7 +94,9 @@ def make_answer_agent_node(
         try:
             grounded_text, citations = await call_with_retry(
                 "answer_agent.generate",
-                lambda: _generate_and_verify(llm, state.rewritten_query or state.query, chunks),
+                lambda: _generate_and_verify(
+                    generation_llm, grounding_llm, state.rewritten_query or state.query, chunks
+                ),
                 retry_count=state.retry_count,
             )
         except Exception as exc:
@@ -97,19 +115,22 @@ def make_answer_agent_node(
 
 
 async def _generate_and_verify(
-    llm: BaseChatModel, query: str, chunks: list[ScoredChunk]
+    generation_llm: BaseChatModel,
+    grounding_llm: BaseChatModel,
+    query: str,
+    chunks: list[ScoredChunk],
 ) -> tuple[str, list[Citation]]:
     """One full generate-then-verify attempt. Raises `_UngroundedAnswerError`
     if the model declined to answer, or if nothing survives grounding
     verification -- either way, `call_with_retry` treats this as a retryable
     failure and tries generation fresh.
     """
-    raw_answer = await generate_answer(llm, query, chunks)
+    raw_answer = await generate_answer(generation_llm, query, chunks)
     if is_no_answer(raw_answer):
         raise _UngroundedAnswerError("model declined to answer from context")
 
     sentences = split_sentences(raw_answer)
-    grounded_sentences = await verify_grounding(llm, sentences, chunks)
+    grounded_sentences = await verify_grounding(grounding_llm, sentences, chunks)
     if not grounded_sentences:
         raise _UngroundedAnswerError("no sentence survived grounding verification")
 

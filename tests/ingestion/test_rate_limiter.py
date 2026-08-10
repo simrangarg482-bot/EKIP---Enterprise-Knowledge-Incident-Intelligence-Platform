@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from app.ingestion.rate_limiter import TokenBucketRateLimiter
+from app.ingestion.rate_limiter import TokenBucketRateLimiter, get_ingestion_rate_limiter
 
 
 @pytest.mark.asyncio
@@ -118,3 +118,13 @@ async def test_concurrent_acquires_for_the_same_key_are_serialized_not_double_sp
     # All three eventually complete (none raise/deadlock); the third one
     # necessarily had to wait for a refill since only 2 tokens existed.
     assert results == [None, None, None]
+
+
+def test_get_ingestion_rate_limiter_returns_the_same_shared_instance() -> None:
+    """2026-08 audit "H2" fix: `ingestion.service` and `JiraConnector` (and
+    any future connector opting out of the generic path) must draw from the
+    exact same buckets, not two independent ones that would silently double
+    the real ceiling -- this is only true if `get_ingestion_rate_limiter()`
+    always returns the one shared instance, never a fresh one.
+    """
+    assert get_ingestion_rate_limiter() is get_ingestion_rate_limiter()

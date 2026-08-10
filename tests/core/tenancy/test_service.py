@@ -18,7 +18,7 @@ import pytest
 
 from app.core.exceptions import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
 from app.core.tenancy import service as tenancy_service
-from app.core.tenancy.schemas import ConnectorConfigCreate, OrganizationCreate
+from app.core.tenancy.schemas import ConnectorConfigCreate, OrganizationCreate, SSOConfigurationCreate
 from app.shared.schemas import ActorKind, Identity
 from app.shared.security import decrypt_secret, get_kms
 
@@ -162,6 +162,62 @@ class _FakeSSOConfigurationRow:
 
 
 @pytest.mark.asyncio
+async def test_configure_sso_encrypts_client_secret_before_storing(monkeypatch) -> None:
+    """Confirmed bug fix (2026-08 audit "C3"): `configure_sso` used to
+    persist `data.client_secret_ref` unchanged -- every organization's real
+    OIDC client secret sat in the database as plaintext. This mirrors
+    `test_register_connector_encrypts_credential_before_storing` exactly:
+    the same encrypt-at-write pattern, applied here for the first time to
+    SSO secrets.
+    """
+    organization_id = uuid.uuid4()
+    actor = _admin(organization_id)
+    plaintext_secret = "real-entra-id-client-secret-value"
+    captured: dict[str, object] = {}
+
+    async def fake_get_sso_configuration_by_organization_id(session, org_id):
+        return None  # not already configured
+
+    async def fake_insert_sso_configuration(session, **kwargs):
+        captured.update(kwargs)
+        return _FakeSSOConfigurationRow(organization_id)
+
+    async def fake_record_audit_event(session, actor, **kwargs):
+        return None
+
+    monkeypatch.setattr(
+        tenancy_service.repository,
+        "get_sso_configuration_by_organization_id",
+        fake_get_sso_configuration_by_organization_id,
+    )
+    monkeypatch.setattr(
+        tenancy_service.repository, "insert_sso_configuration", fake_insert_sso_configuration
+    )
+    monkeypatch.setattr(tenancy_service, "record_audit_event", fake_record_audit_event)
+
+    await tenancy_service.configure_sso(
+        None,
+        actor,
+        organization_id,
+        SSOConfigurationCreate(
+            provider="okta",
+            issuer_url="https://acme.okta.com",
+            client_id="client-123",
+            client_secret_ref=plaintext_secret,
+        ),
+    )
+
+    stored_client_secret_ref = captured["client_secret_ref"]
+    assert stored_client_secret_ref != plaintext_secret
+    assert plaintext_secret not in stored_client_secret_ref
+
+    # A real, working envelope -- round-trips back to the original
+    # plaintext via the same KMS `core.auth.service._resolve_client_secret`
+    # uses.
+    assert decrypt_secret(get_kms(), stored_client_secret_ref) == plaintext_secret
+
+
+@pytest.mark.asyncio
 async def test_get_organization_sso_config_sets_tenant_context_before_reading_sso_row(
     monkeypatch,
 ) -> None:
@@ -277,6 +333,9 @@ async def test_create_organization_without_actor_records_no_audit_event(monkeypa
     async def fake_insert_organization(session, *, name, slug):
         return _FakeOrgRow(name=name, slug=slug)
 
+    async def fake_set_tenant_context(session, org_id) -> None:
+        return None
+
     async def fake_insert_project(session, **kwargs):
         return None
 
@@ -287,6 +346,7 @@ async def test_create_organization_without_actor_records_no_audit_event(monkeypa
         tenancy_service.repository, "get_organization_by_slug", fake_get_organization_by_slug
     )
     monkeypatch.setattr(tenancy_service.repository, "insert_organization", fake_insert_organization)
+    monkeypatch.setattr(tenancy_service, "set_tenant_context", fake_set_tenant_context)
     monkeypatch.setattr(tenancy_service.repository, "insert_project", fake_insert_project)
     monkeypatch.setattr(tenancy_service, "record_audit_event", fake_record_audit_event)
 
@@ -313,6 +373,9 @@ async def test_create_organization_with_actor_records_audit_event(monkeypatch) -
     async def fake_insert_organization(session, *, name, slug):
         return _FakeOrgRow(name=name, slug=slug)
 
+    async def fake_set_tenant_context(session, org_id) -> None:
+        return None
+
     async def fake_insert_project(session, **kwargs):
         return None
 
@@ -324,6 +387,7 @@ async def test_create_organization_with_actor_records_audit_event(monkeypatch) -
         tenancy_service.repository, "get_organization_by_slug", fake_get_organization_by_slug
     )
     monkeypatch.setattr(tenancy_service.repository, "insert_organization", fake_insert_organization)
+    monkeypatch.setattr(tenancy_service, "set_tenant_context", fake_set_tenant_context)
     monkeypatch.setattr(tenancy_service.repository, "insert_project", fake_insert_project)
     monkeypatch.setattr(tenancy_service, "record_audit_event", fake_record_audit_event)
 
@@ -334,6 +398,65 @@ async def test_create_organization_with_actor_records_audit_event(monkeypatch) -
     assert len(audit_calls) == 1
     assert audit_calls[0]["action"] == "organization.create"
     assert audit_calls[0]["resource_id"] == result.id
+
+
+@pytest.mark.asyncio
+async def test_create_organization_sets_tenant_context_before_inserting_project(
+    monkeypatch,
+) -> None:
+    """Confirmed bug (2026-08 audit "C2"): `projects` is RLS-protected
+    (`FORCE ROW LEVEL SECURITY`, keyed on `app.current_organization_id`), but
+    `create_organization` used to insert the default "General" project
+    without ever calling `set_tenant_context` first. Under real RLS
+    enforcement that insert should be rejected outright (the GUC would still
+    be unset/stale, never equal to the brand-new organization's id). This
+    asserts the ordering: `insert_organization` -> `set_tenant_context` ->
+    `insert_project` -- and that the audit write (if `actor` is given) also
+    lands after the GUC is set, since it happens later in the same
+    transaction.
+    """
+    organization_id = uuid.uuid4()
+    actor = _admin(organization_id)
+    call_order: list[str] = []
+
+    async def fake_get_organization_by_slug(session, slug):
+        return None
+
+    async def fake_insert_organization(session, *, name, slug):
+        call_order.append("insert_organization")
+        return _FakeOrgRow(name=name, slug=slug)
+
+    async def fake_set_tenant_context(session, org_id) -> None:
+        call_order.append("set_tenant_context")
+
+    async def fake_insert_project(session, **kwargs):
+        call_order.append("insert_project")
+        assert "set_tenant_context" in call_order, (
+            "insert_project (RLS-protected) ran before set_tenant_context"
+        )
+        return None
+
+    async def fake_record_audit_event(session, event_actor, **kwargs):
+        call_order.append("record_audit_event")
+
+    monkeypatch.setattr(
+        tenancy_service.repository, "get_organization_by_slug", fake_get_organization_by_slug
+    )
+    monkeypatch.setattr(tenancy_service.repository, "insert_organization", fake_insert_organization)
+    monkeypatch.setattr(tenancy_service, "set_tenant_context", fake_set_tenant_context)
+    monkeypatch.setattr(tenancy_service.repository, "insert_project", fake_insert_project)
+    monkeypatch.setattr(tenancy_service, "record_audit_event", fake_record_audit_event)
+
+    await tenancy_service.create_organization(
+        None, OrganizationCreate(name="Acme", slug="acme"), actor=actor
+    )
+
+    assert call_order == [
+        "insert_organization",
+        "set_tenant_context",
+        "insert_project",
+        "record_audit_event",
+    ]
 
 
 # --- accept_invitation hardening -----------------------------------------------

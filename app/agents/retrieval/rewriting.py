@@ -22,6 +22,7 @@ import uuid
 from langchain_core.language_models import BaseChatModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.llm import log_llm_usage
 from app.agents.retry import call_with_retry
 from app.core.incidents import service as incidents_service
 from app.shared.config.logging import get_logger
@@ -100,6 +101,7 @@ async def rewrite_query(
         logger.warning("query_rewrite_failed_using_original", query=query, error=str(exc))
         return query
 
+    log_llm_usage("rewrite", llm, response)
     rewritten_text = str(response.content).strip()
     return rewritten_text or query
 

@@ -18,8 +18,10 @@ from arq.cron import cron
 from app.ingestion.workers.tasks import run_ingestion_job_task, scheduled_reconciliation
 from app.shared.config.logging import configure_logging
 from app.shared.config.settings import get_settings
+from app.shared.config.tracing import configure_tracing
 
 configure_logging()
+configure_tracing()
 
 
 class WorkerSettings:
@@ -58,6 +60,14 @@ class WorkerSettings:
     # `requests_per_second = 0.5`), and a channel/repo with real history
     # can need enough pages that the wait time alone exceeds 300s -- arq
     # then cancels the job mid-page rather than the connector or the app
-    # failing outright. 30 minutes gives a real first sync room to finish
-    # under that throttle instead of being treated as stuck.
-    job_timeout = 1800
+    # failing outright. 30 minutes (the default) gives a real first sync
+    # room to finish under that throttle instead of being treated as stuck.
+    #
+    # Sourced from `Settings.ingestion_job_timeout_seconds` (2026-08 audit
+    # "H1" fix) rather than hardcoded here a second time -- `app.ingestion.
+    # service._execute_ingestion_job` derives its own, slightly shorter
+    # internal `asyncio.wait_for` timeout from the same setting, so this
+    # value is the outer hard-kill backstop: it should only ever fire if
+    # that internal timeout itself somehow fails to unwind cleanly (e.g. a
+    # hung database write), not during an ordinary slow sync.
+    job_timeout = get_settings().ingestion_job_timeout_seconds

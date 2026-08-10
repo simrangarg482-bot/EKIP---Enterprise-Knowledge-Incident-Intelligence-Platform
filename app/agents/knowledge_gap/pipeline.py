@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.knowledge_gap import repository
 from app.agents.knowledge_gap.clustering import cluster_by_similarity, cosine_similarity
+from app.agents.llm import log_llm_usage
 from app.database.models.agent_models import AgentExecution, KnowledgeGapReport
 from app.retrieval import embedding
 from app.retrieval import service as retrieval_service
@@ -101,6 +102,7 @@ async def _synthesize_topic(llm: BaseChatModel, queries: list[str]) -> str:
         "limits'."
     )
     response = await llm.ainvoke(prompt)
+    log_llm_usage("knowledge_gap", llm, response)
     return str(response.content).strip()
 
 

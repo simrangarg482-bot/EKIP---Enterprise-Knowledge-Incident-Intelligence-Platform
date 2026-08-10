@@ -23,12 +23,19 @@ fall back to.
 
 `project_permissions` is the extension point for the second, finer-grained
 authorization tier (section 3.6): a project-scoped role can override the
-identity's org-level `permissions` for a specific project. It defaults to
-empty here -- no code path populates it yet (project-level authorization is
-not implemented as of this change; see core/users/service.py's docstring) --
-but the field is part of the target `Identity` shape per PROJECT_PLAN.md, so
-`has_permission`/`authorize` already support it and adding real project-scoped
-resolution later is additive, not another breaking change to this schema.
+identity's org-level `permissions` for a specific project. `core/users/
+service.py`'s `resolve_identity` populates it from `project_memberships` for
+every identity resolution, so it defaults to empty only for callers who hold
+no project-scoped membership row at all (today, most callers -- there is no
+API yet to create a `project_memberships` row; see that table's own
+docstring). `resolve_search_scope()` below is the sanctioned way for a
+retrieval/search caller to turn this into a `project_ids` restriction: a
+caller with no project-scoped grants may still search every project they can
+see via their org-level `permissions` (the pre-existing, unrestricted
+default), but a caller who *does* hold one or more project-scoped grants is
+restricted to exactly those projects -- holding an org-level permission is
+no longer, on its own, sufficient to see a project the caller has no
+membership row for.
 """
 
 from __future__ import annotations
@@ -88,8 +95,9 @@ class Identity(BaseModel):
     roles: tuple[str, ...] = ()
     permissions: frozenset[str] = Field(default_factory=frozenset)
     # Project-scoped permission overrides (PROJECT_PLAN.md section 3.6):
-    # project_id -> permission codes granted *for that project*. Empty by
-    # default; see the module docstring for why this isn't populated yet.
+    # project_id -> permission codes granted *for that project*. Populated by
+    # `resolve_identity`; empty here only for callers with no project
+    # membership row (see the module docstring).
     project_permissions: dict[uuid.UUID, frozenset[str]] = Field(default_factory=dict)
 
     @property
@@ -118,6 +126,38 @@ class Identity(BaseModel):
         if project_id is not None and project_id in self.project_permissions:
             return permission_code in self.project_permissions[project_id]
         return permission_code in self.permissions
+
+    def resolve_search_scope(self) -> tuple[list[uuid.UUID] | None, frozenset[str]]:
+        """Resolve `(project_ids, permission_codes)` for a
+        `retrieval.schemas.SearchFilters` construction.
+
+        This is the sanctioned place a retrieval/search caller (agents/*)
+        turns `project_permissions` into the hard project-level restriction
+        `SearchFilters.project_ids` expects -- `retrieval/`'s own module
+        docstring is explicit that resolving "which projects can this caller
+        see" from an `Identity` is not retrieval's job, so that resolution
+        has to happen here, on the object that actually carries the data,
+        rather than being re-derived ad hoc at each call site.
+
+        With no project-scoped grants at all, returns `(None, self.
+        permissions)` -- `SearchFilters.project_ids=None` means "no
+        project-level restriction," preserving the existing, unrestricted
+        behavior for the common case of a caller with only org-level
+        permissions. With one or more project-scoped grants, returns
+        `(list(self.project_permissions.keys()), merged_permissions)`:
+        search is restricted to *exactly* the projects the caller has a
+        membership row for, and `permission_codes` is widened to include
+        every project-scoped permission code alongside the org-level ones
+        (safe to widen here, never a leak, because it is always applied
+        together with the now-restricted `project_ids` in the same query --
+        a permission code granted only for project B cannot surface a
+        project A chunk).
+        """
+        if not self.project_permissions:
+            return None, self.permissions
+        project_ids = list(self.project_permissions.keys())
+        merged_permissions = self.permissions.union(*self.project_permissions.values())
+        return project_ids, merged_permissions
 
     @classmethod  # qki agents bohot saare hai
     def for_agent(cls, agent_name: str, organization_id: uuid.UUID) -> "Identity":
