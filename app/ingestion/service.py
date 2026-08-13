@@ -602,6 +602,10 @@ async def _process_one_item(
     # the Document/document_metadata writes above, so a mid-job failure
     # rolls back the chunks along with the row they belong to.
     collection = _CONTENT_TYPE_TO_COLLECTION[processed.content_type]
+    # Only the GitHub connector ever sets a "repo" metadata key -- every
+    # other connector leaves this `None`, matching `repo_full_name`'s
+    # nullable column (see UpsertChunk's docstring).
+    repo_full_name = raw_document.metadata.get("repo")
     upsert_chunks = [
         UpsertChunk(
             document_id=document_row.id,
@@ -613,6 +617,7 @@ async def _process_one_item(
             source_offset_start=chunk.source_offset_start,
             source_offset_end=chunk.source_offset_end,
             acl_permission_code=document_row.acl_permission_code,
+            repo_full_name=repo_full_name,
         )
         for chunk in processed.chunks
     ]

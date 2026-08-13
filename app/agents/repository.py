@@ -52,15 +52,21 @@ async def insert_agent_execution(
     agent_name: str,
     trigger_source: str,
     input_summary: dict | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> AgentExecution:
     """Create one `agent_executions` row (`status="running"`) and return it
     with server-side defaults (`id`, `started_at`) populated.
+
+    `user_id` (added alongside `GET /ask/history`) is the human who triggered
+    this call over REST, if any -- omitted/`None` for MCP and scheduled
+    executions, which have no human user to attribute to.
     """
     row = AgentExecution(
         organization_id=organization_id,
         agent_name=agent_name,
         trigger_source=trigger_source,
         input_summary=input_summary,
+        user_id=user_id,
         status="running",
     )
     session.add(row)
@@ -119,3 +125,34 @@ async def get_agent_execution_stats(
 
     result = await session.execute(stmt)
     return list(result.all())
+
+
+async def list_agent_executions_for_user(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    organization_id: uuid.UUID,
+    limit: int,
+    offset: int,
+) -> list[AgentExecution]:
+    """Return `user_id`'s own past executions within `organization_id`,
+    newest first -- backs `GET /ask/history` (`agents.service.
+    get_question_history`). Filtered by both `user_id` and `organization_id`:
+    the latter is redundant with RLS (this table's policy already restricts
+    every query on this session to the caller's own organization) but stated
+    explicitly anyway, the same defense-in-depth precedent `core.users.
+    repository`'s resolution queries already set for "don't rely on RLS
+    alone to be the only thing enforcing tenant isolation in this query."
+    """
+    stmt = (
+        select(AgentExecution)
+        .where(
+            AgentExecution.user_id == user_id,
+            AgentExecution.organization_id == organization_id,
+        )
+        .order_by(AgentExecution.started_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())

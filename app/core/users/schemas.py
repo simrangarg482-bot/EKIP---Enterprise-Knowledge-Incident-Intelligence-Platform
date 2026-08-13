@@ -57,3 +57,22 @@ class UserProfile(BaseModel):
     permissions: tuple[str, ...] = ()
     created_at: datetime
     updated_at: datetime
+
+
+class UserCredentialLookup(BaseModel):
+    """The minimum a caller verifying a *password* credential needs -- not a
+    full `User` row.
+
+    Exists so `core.auth.service` (which owns hashing/verification -- see
+    that module's docstring, "core/auth verifies authentication") can check a
+    password without core/users handing another module a raw ORM row, or
+    core/auth reaching into `core.users.repository` directly (breaking the
+    "call the owning layer's service.py, never its repository.py" convention
+    every other cross-module call in this codebase follows).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    user_id: uuid.UUID
+    password_hash: str | None
+    is_active: bool

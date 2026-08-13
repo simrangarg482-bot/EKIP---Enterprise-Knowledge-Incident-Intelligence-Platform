@@ -47,6 +47,12 @@ class SearchFilters(BaseModel):
     organization_id: uuid.UUID
     project_ids: list[uuid.UUID] | None = None
     permission_codes: frozenset[str] = Field(default_factory=frozenset)
+    # Restricts results to one GitHub repo (`"owner/name"`, matching
+    # `document_metadata`'s `repo` entry / `CodeChunk.repo_full_name`).
+    # Only meaningful for the `"code"` collection -- `PgVectorStore` raises
+    # if this is set while searching any other collection, since no other
+    # collection's table carries a `repo_full_name` column to filter on.
+    repository: str | None = None
 
 
 class UpsertChunk(BaseModel):
@@ -77,6 +83,11 @@ class UpsertChunk(BaseModel):
     source_offset_start: int
     source_offset_end: int
     acl_permission_code: str | None = None
+    # Denormalized `"owner/name"` for GitHub-sourced chunks (from the
+    # connector's `document_metadata` `repo` entry), so `SearchFilters.
+    # repository` can filter on the stored row directly instead of joining
+    # back to `document_metadata`. `None` for every non-GitHub chunk.
+    repo_full_name: str | None = None
 
 
 class ScoredChunk(BaseModel):

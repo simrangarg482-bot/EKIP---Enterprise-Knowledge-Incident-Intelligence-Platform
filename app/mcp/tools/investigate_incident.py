@@ -22,7 +22,16 @@ from app.shared.schemas import Identity
 
 @mcp_server.tool()
 async def investigate_incident(incident_id: str, ctx: Context) -> dict[str, Any]:
-    """`{incident_id: str}` -> `AskResponse` (with `investigation` populated)."""
+    """Run a full root-cause investigation on one specific, already-known
+    EKIP incident (given its UUID) -- gathering evidence (related code
+    changes, similar past incidents, relevant docs) and producing hypotheses,
+    not just a grounded answer. Use this instead of `ask_question` when the
+    user already has a specific incident ID in hand and wants a deep
+    investigation rather than a quick answer.
+
+    Returns: `{incident_id: str}` -> `AskResponse` (with `investigation`
+    populated).
+    """
     raw_token = extract_bearer_token(ctx)
     parsed_incident_id = uuid.UUID(incident_id)
 

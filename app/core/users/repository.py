@@ -35,6 +35,21 @@ from app.database.models.core_models import (
 )
 from app.database.models.tenancy_models import Project, ProjectMembership
 
+#: Every permission code a self-service signup's bootstrap "admin" role
+#: grants -- the same fixed list `scripts/seed_test_organization.py`'s
+#: dev-only bootstrap has always used (kept in sync by hand; both exist to
+#: grant "everything this app currently checks," not a design each should
+#: independently decide). Not a `Settings` field: this is what "admin"
+#: *means* in this codebase today, not a deployment-time configuration.
+ADMIN_PERMISSION_CODES: Sequence[str] = (
+    "tenancy:manage",
+    "incident:write",
+    "postmortem:write",
+    "postmortem:approve",
+    "knowledge:review",
+    "observability:read",
+)
+
 
 async def get_by_id(session: AsyncSession, user_id: uuid.UUID) -> User | None:
     """Fetch a single user by primary key, or None if absent."""
@@ -206,3 +221,87 @@ async def get_project_permission_map(
     for project_id, code in result.all():
         grouped.setdefault(project_id, set()).add(code)
     return {project_id: frozenset(codes) for project_id, codes in grouped.items()}
+
+
+async def update_password_hash(session: AsyncSession, *, user_id: uuid.UUID, password_hash: str) -> None:
+    """Set (or replace) `user_id`'s local password credential.
+
+    Used only by `core.auth.service.signup` -- keeps the "only core/users's
+    repository writes `users` rows" discipline intact rather than having
+    core/auth reach into this table directly.
+    """
+    row = await session.get(User, user_id)
+    if row is None:
+        raise ValueError(f"update_password_hash: no such user {user_id}")  # unreachable in practice
+    row.password_hash = password_hash
+    await session.flush()
+
+
+async def get_first_organization_id(session: AsyncSession, user_id: uuid.UUID) -> uuid.UUID | None:
+    """Return one organization `user_id` holds a role in, or `None` if they
+    hold none anywhere.
+
+    Used by `core.auth.service.login_with_password`: a password-auth account
+    is created by `signup` with exactly one role assignment (in the
+    organization signup itself created), so "first" is unambiguous today --
+    this does not attempt to support a password-auth user who has since
+    joined a second organization some other way, which isn't a flow this
+    codebase builds yet (see `core.auth.service.signup`'s own docstring).
+    """
+    stmt = select(UserRole.organization_id).where(UserRole.user_id == user_id).limit(1)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_or_create_permissions(session: AsyncSession, codes: Sequence[str]) -> list[Permission]:
+    """Fetch existing `Permission` rows for `codes`, inserting any missing
+    ones -- the same "populate the fixed catalog if it isn't there yet"
+    behavior `scripts/seed_test_organization.py`'s dev bootstrap already
+    relies on, now reusable by real signup instead of only a dev script.
+    """
+    result = await session.execute(select(Permission).where(Permission.code.in_(codes)))
+    existing = {row.code: row for row in result.scalars().all()}
+
+    permissions = []
+    for code in codes:
+        if code in existing:
+            permissions.append(existing[code])
+            continue
+        permission = Permission(code=code, description=f"Seeded by signup bootstrap: {code}")
+        session.add(permission)
+        permissions.append(permission)
+    await session.flush()
+    return permissions
+
+
+async def get_or_create_role_by_name(session: AsyncSession, name: str, *, description: str) -> Role:
+    """Fetch the `Role` named `name`, creating it (with `description`) if it
+    doesn't exist yet. Idempotent -- safe to call on every signup, not just
+    the first.
+    """
+    existing = await get_role_by_name(session, name)
+    if existing is not None:
+        return existing
+
+    role = Role(name=name, description=description)
+    session.add(role)
+    await session.flush()
+    return role
+
+
+async def grant_permissions_to_role(
+    session: AsyncSession, *, role_id: uuid.UUID, permissions: Sequence[Permission]
+) -> None:
+    """Grant every permission in `permissions` to `role_id`, skipping any
+    already granted -- idempotent, mirroring `insert_user_role`'s sibling
+    `get_user_role`-then-`insert_user_role` pattern rather than relying on a
+    database-constraint-driven retry.
+    """
+    granted = await session.execute(
+        select(RolePermission.permission_id).where(RolePermission.role_id == role_id)
+    )
+    already_granted = set(granted.scalars().all())
+    for permission in permissions:
+        if permission.id not in already_granted:
+            session.add(RolePermission(role_id=role_id, permission_id=permission.id))
+    await session.flush()

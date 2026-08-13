@@ -35,7 +35,8 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, Header, Security
+from arq import ArqRedis
+from fastapi import Depends, Header, Request, Security
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,6 +47,18 @@ from app.database.session import get_db_session, set_tenant_context
 from app.shared.schemas import Identity
 
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
+
+
+def get_arq_pool(request: Request) -> ArqRedis:
+    """The one `arq` Redis pool `app.api.main`'s lifespan opened at startup
+    -- for enqueueing jobs onto the same queue `app.ingestion.workers.main`'s
+    worker process consumes (`POST /tenancy/connectors/{id}/sync` is the
+    first, and so far only, caller).
+    """
+    return request.app.state.arq_pool
+
+
+ArqPool = Annotated[ArqRedis, Depends(get_arq_pool)]
 
 # `auto_error=False`: a missing/malformed header must still surface as our
 # own `PermissionDeniedError` (via `_extract_bearer_token`), not FastAPI's

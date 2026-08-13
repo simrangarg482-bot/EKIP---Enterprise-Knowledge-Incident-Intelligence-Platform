@@ -1,0 +1,393 @@
+{
+  "_comment": [
+    "Golden dataset for scripts/eval_confidence.py -- evaluates EKIP's",
+    "confidence-gated routing (app/agents/confidence.py) against real,",
+    "already-ingested content in the `test-org` organization (same org",
+    "tests/rag_validation/rag_dataset.json uses), not synthetic text.",
+    "",
+    "Every question below was checked against the live corpus on 2026-08-13",
+    "(81 documents: 24 slack, 56 github, 1 manual; 63 documentation chunks, 6",
+    "code chunks, 24 conversation chunks) before being labeled -- `evidence`",
+    "quotes the verbatim retrieved content the label is based on, so a label",
+    "can be re-verified later without re-querying the database from scratch.",
+    "",
+    "Three categories, matching what the confidence gate must tell apart:",
+    "  clear-answer   -- the corpus states the fact plainly. expected_route",
+    "                    is 'answer'; a well-tuned gate should score these",
+    "                    high and let the Answer Agent respond.",
+    "  ambiguous      -- the corpus contains a relevant chunk (retrieval",
+    "                    will find *something*), but it is a bare commit",
+    "                    title, a generic phrase ('unknown IP', 'more than",
+    "                    expected'), or conflicting values across chunks --",
+    "                    not enough to state the specific fact asked.",
+    "                    expected_route is 'investigation': a system that",
+    "                    answers confidently here is the failure mode",
+    "                    tests/rag_validation/README.md calls 'the single",
+    "                    most damaging' -- a confidently wrong answer.",
+    "  no-information -- nothing in the corpus is relevant at all (domain-",
+    "                    adjacent-but-absent, or fully out of domain).",
+    "                    expected_route is 'investigation'.",
+    "",
+    "expected_answer is a short reference answer for clear-answer questions,",
+    "or a one-line statement of *why* the question can't be fully answered",
+    "for ambiguous/no-information ones. scripts/eval_confidence.py does not",
+    "grade answer text against it (that is tests/rag_validation's job, via",
+    "expected_fact_groups) -- it is printed alongside the model's actual",
+    "answer purely so a human skimming the report can sanity-check it.",
+    "",
+    "collection names 'code'/'conversations' are `retrieval.schemas.",
+    "CollectionName` collections, not `Document.source` values."
+  ],
+  "questions": [
+    {
+      "id": "sso-login-failure",
+      "category": "clear-answer",
+      "collection": "documentation+conversations",
+      "question": "Why were users unable to log in through Google Workspace SSO, and what fixed it?",
+      "expected_answer": "The OIDC callback/redirect URI was misconfigured in the identity provider; correcting the redirect URI fixed SSO login.",
+      "expected_route": "answer",
+      "rationale": "Stated plainly and consistently in both the slack incident thread and the mirrored github issue.",
+      "evidence": ["The OIDC callback URL appears to be incorrect in the identity provider configuration.", "Updated the redirect URI configuration.", "SSO login is working again."]
+    },
+    {
+      "id": "embedding-worker-memory",
+      "category": "clear-answer",
+      "collection": "documentation+conversations",
+      "question": "What caused the application containers to restart due to embedding worker memory usage, and what configuration change resolved it?",
+      "expected_answer": "The embedding service was consuming more memory than expected after being enabled; reducing worker concurrency from 10 to 4 stabilized the containers.",
+      "expected_route": "answer",
+      "rationale": "Root cause and the exact fix (10 -> 4) are both stated directly.",
+      "evidence": ["Memory usage increased after enabling document embedding workers.", "Reduced worker concurrency from 10 to 4.", "Container stab[ility restored]"]
+    },
+    {
+      "id": "incidents-api-500",
+      "category": "clear-answer",
+      "collection": "documentation+conversations",
+      "question": "Why does the incidents API return an HTTP 500 error when filtering by date range?",
+      "expected_answer": "The query builder generated invalid SQL for empty date filters; the query validation logic was fixed and regression tests were added.",
+      "expected_route": "answer",
+      "rationale": "Root cause and fix stated directly.",
+      "evidence": ["The query builder was generating invalid SQL for empty date filters.", "Fixed the query validation logic.", "Added regression tests for date filtering."]
+    },
+    {
+      "id": "brute-force-login",
+      "category": "clear-answer",
+      "collection": "documentation+conversations",
+      "question": "What happened during the suspicious login attempts incident, and what mitigation was applied?",
+      "expected_answer": "Multiple failed login attempts were detected (a brute-force attempt); the account was auto-locked after 10 failed attempts and additional rate limiting was added.",
+      "expected_route": "answer",
+      "rationale": "The general incident and its mitigation (rate limiting) are stated directly.",
+      "evidence": ["We detected multiple failed login attempts from an unknown IP address.", "The account was temporarily locked automatically after 10 failed attempts.", "Added additional rate limiting to the auth[entication endpoint]."]
+    },
+    {
+      "id": "alembic-lock-timeout",
+      "category": "clear-answer",
+      "collection": "conversations",
+      "question": "Why did the Alembic database migration fail with a lock timeout, and what solution was recommended?",
+      "expected_answer": "The migration modified a large table during peak traffic; the fix was to schedule migrations during low-traffic windows and use batch operations.",
+      "expected_route": "answer",
+      "rationale": "Root cause and recommended solution both stated directly.",
+      "evidence": ["Error message: \"lock timeout exceeded while waiting for relation\".", "The migration was modifying a large table during peak traffic hours.", "Solution: schedule migrations during low traffic windows and use batch operations."]
+    },
+    {
+      "id": "api-latency-analytics",
+      "category": "clear-answer",
+      "collection": "documentation+conversations",
+      "question": "What caused the API latency increase after the analytics deployment, and how was it resolved?",
+      "expected_answer": "A missing database index on user_activity caused the latency increase; adding the index resolved it.",
+      "expected_route": "answer",
+      "rationale": "Root cause and fix stated directly; also the source of the 'deployment-version' fact below.",
+      "evidence": ["API latency increased after analytics deployment"]
+    },
+    {
+      "id": "rag-retrieval-quality",
+      "category": "clear-answer",
+      "collection": "documentation+conversations",
+      "question": "What changes were made to improve retrieval accuracy when the RAG system was returning irrelevant documents?",
+      "expected_answer": "Smaller chunk sizes and improved metadata filtering were implemented, plus reranking using a cross-encoder model.",
+      "expected_route": "answer",
+      "rationale": "Both fixes (chunking, reranking) stated directly.",
+      "evidence": ["The issue appears to be low-quality chunks from long documents.", "Implemented smaller chunk sizes and improved metadata filtering.", "Added reranking using a cross encoder mo[del]."]
+    },
+    {
+      "id": "checkout-500-runbook",
+      "category": "clear-answer",
+      "collection": "documentation",
+      "question": "According to the runbook, what should be checked first when checkout returns a 500 error?",
+      "expected_answer": "Check the payment adapter for null handling.",
+      "expected_route": "answer",
+      "rationale": "The entire runbook document is this one sentence, stated directly.",
+      "evidence": ["If checkout returns 500, check the payment adapter for null handling."]
+    },
+    {
+      "id": "deployment-version",
+      "category": "clear-answer",
+      "collection": "documentation",
+      "question": "Which application version was deployed to production when the API latency problem began?",
+      "expected_answer": "Version 2.4.0.",
+      "expected_route": "answer",
+      "rationale": "Verified in tests/rag_validation/rag_dataset.json against the same corpus.",
+      "evidence": ["2.4.0"]
+    },
+    {
+      "id": "code-patch-config-purpose",
+      "category": "clear-answer",
+      "collection": "code",
+      "question": "What does the patch_config function in app.py do, and why was it needed?",
+      "expected_answer": "It recursively rewrites InputLayer entries in a loaded Keras model config that use the newer 'batch_shape' key, converting them to the older 'batch_input_shape' key the installed Keras version expects -- fixing a Keras version mismatch.",
+      "expected_route": "answer",
+      "rationale": "Full function body plus its explanatory comment are both ingested verbatim in the code collection.",
+      "evidence": ["FIX: Patch model config JSON to handle Keras version mismatch", "def patch_config(config): \"\"\"Recursively patch model config dict to fix version incompatibilities.\"\"\""]
+    },
+    {
+      "id": "code-sample-with-temperature",
+      "category": "clear-answer",
+      "collection": "code",
+      "question": "How does the sample_with_temperature function in app.py pick the next predicted token?",
+      "expected_answer": "It rescales log-probabilities by the temperature, re-softmaxes, restricts to the top_k highest-probability indices, and samples one of them weighted by their renormalized probabilities.",
+      "expected_route": "answer",
+      "rationale": "Full function body ingested verbatim in the code collection.",
+      "evidence": ["def sample_with_temperature(preds, temperature=1.0, top_k=10):", "top_indices = np.argsort(preds)[-top_k:]", "return np.random.choice(top_indices, p=top_probs)"]
+    },
+    {
+      "id": "code-keras-mismatch-commit",
+      "category": "clear-answer",
+      "collection": "code",
+      "question": "What was the fix committed for the Keras version mismatch in app.py called?",
+      "expected_answer": "\"Fix: Add FixedInputLayer to handle Keras version mismatch in app.py\".",
+      "expected_route": "answer",
+      "rationale": "Commit message chunk ingested verbatim.",
+      "evidence": ["Fix: Add FixedInputLayer to handle Keras version mismatch in app.py"]
+    },
+    {
+      "id": "test1-docs-restructure",
+      "category": "clear-answer",
+      "collection": "documentation",
+      "question": "What did the 'Improve test-1 documentation and developer experience' change actually restructure?",
+      "expected_answer": "It expanded the repository's documentation into a proper docs/ directory (introduction, installation, local development, structure, usage, troubleshooting), improved code comments in the validation script, and extended contributor guidance.",
+      "expected_route": "answer",
+      "rationale": "The commit body (not just its title) is ingested with specific detail.",
+      "evidence": ["Expand the repository's documentation into a proper `docs/` directory (introduction, installation, local development, structure, usage, testing, troubleshooting), improve code comments in the existing validation script, and extend the contributo[r guidance]"]
+    },
+    {
+      "id": "readme-project-name",
+      "category": "clear-answer",
+      "collection": "documentation",
+      "question": "What is the name given to this repository in its README?",
+      "expected_answer": "test-1.",
+      "expected_route": "answer",
+      "rationale": "Trivial but directly and unambiguously stated -- a useful floor case for 'this should score very high'.",
+      "evidence": ["# test-1"]
+    },
+    {
+      "id": "python-version-conflict",
+      "category": "ambiguous",
+      "collection": "documentation",
+      "question": "What Python version does this project require?",
+      "expected_answer": "The corpus contains conflicting commits pinning Python to 3.10.13, 3.11, 3.11.9, and 3.13 at different points -- no single current authoritative version is stated.",
+      "expected_route": "investigation",
+      "rationale": "Retrieval will surface several real, relevant, but mutually contradictory chunks -- exactly the ambiguity a confidence gate should catch rather than pick one and state it as fact.",
+      "evidence": ["Force Python 3.11: Add .python-version and remove pyproject.toml", "Lock Python 3.10.13 with compatible requirements", "Update requirements for Python 3.13 compatibility", "Fix: pin Python 3.11.9 and compatible package versions for Render dep[loyment]"]
+    },
+    {
+      "id": "tensorflow-keras-upgrade-reason",
+      "category": "ambiguous",
+      "collection": "documentation",
+      "question": "Why was TensorFlow and Keras upgraded to support the modern model format?",
+      "expected_answer": "The corpus only records that this change happened (a bare commit title) -- no rationale or problem description was ingested.",
+      "expected_route": "investigation",
+      "rationale": "The only ingested chunk for this commit is its own title, verified directly against the database -- retrieval finds a relevant-looking hit with nothing behind it.",
+      "evidence": ["Fix: Upgrade TensorFlow and Keras to support modern model format"]
+    },
+    {
+      "id": "render-build-command-fix",
+      "category": "ambiguous",
+      "collection": "documentation",
+      "question": "What exactly was wrong with the buildCommand's && operator on Render, and how was it fixed?",
+      "expected_answer": "The corpus only records the commit title ('Fix buildCommand with && operator for Render') -- no detail on the underlying problem or the fix itself.",
+      "expected_route": "investigation",
+      "rationale": "Bare commit-title chunk, verified directly against the database.",
+      "evidence": ["Fix buildCommand with && operator for Render"]
+    },
+    {
+      "id": "force-python311-reason",
+      "category": "ambiguous",
+      "collection": "documentation",
+      "question": "Why did the project force Python 3.11 and remove pyproject.toml?",
+      "expected_answer": "The corpus only records the commit title -- no stated reason for forcing 3.11 or removing pyproject.toml.",
+      "expected_route": "investigation",
+      "rationale": "Bare commit-title chunk, verified directly against the database.",
+      "evidence": ["Force Python 3.11: Add .python-version and remove pyproject.toml"]
+    },
+    {
+      "id": "startup-crash-root-cause",
+      "category": "ambiguous",
+      "collection": "documentation",
+      "question": "What was the root cause of the startup crash that was fixed by deferring model/tokenizer loading with caching?",
+      "expected_answer": "The corpus only records the commit title -- the actual root cause of the startup crash is not described.",
+      "expected_route": "investigation",
+      "rationale": "Bare commit-title chunk, verified directly against the database.",
+      "evidence": ["Defer model/tokenizer loading with caching to fix startup crash"]
+    },
+    {
+      "id": "rag-chunk-size-exact-value",
+      "category": "ambiguous",
+      "collection": "documentation+conversations",
+      "question": "What exact chunk size value was used after the RAG retrieval quality fix?",
+      "expected_answer": "The corpus says 'smaller chunk sizes' were used; no specific numeric value is given.",
+      "expected_route": "investigation",
+      "rationale": "The general fix is well-documented (see 'rag-retrieval-quality' clear-answer case), but this question asks for a specific number the corpus never states -- retrieval finds real, relevant, but insufficient evidence.",
+      "evidence": ["Implemented smaller chunk sizes and improved metadata filtering."]
+    },
+    {
+      "id": "alembic-exact-maintenance-window",
+      "category": "ambiguous",
+      "collection": "conversations",
+      "question": "What specific time of day was chosen as the maintenance window for the Alembic migration fix?",
+      "expected_answer": "The corpus recommends 'low traffic windows' generically; no specific time of day is given.",
+      "expected_route": "investigation",
+      "rationale": "Same underlying incident as 'alembic-lock-timeout', but asks for a specific detail the corpus never states.",
+      "evidence": ["Solution: schedule migrations during low traffic windows and use batch operations."]
+    },
+    {
+      "id": "brute-force-source-ip",
+      "category": "ambiguous",
+      "collection": "conversations",
+      "question": "Which specific IP address was the source of the brute-force login attempts?",
+      "expected_answer": "The corpus explicitly says the IP address was unknown -- it does not identify a specific IP.",
+      "expected_route": "investigation",
+      "rationale": "Retrieval will confidently find the incident, but the specific fact asked for is explicitly stated as not known -- a good test that 'found a relevant chunk' must not be conflated with 'the fact is answerable'.",
+      "evidence": ["We detected multiple failed login attempts from an unknown IP address."]
+    },
+    {
+      "id": "embedding-worker-exact-memory-gb",
+      "category": "ambiguous",
+      "collection": "conversations",
+      "question": "How many GB of memory was the embedding worker actually consuming before concurrency was reduced?",
+      "expected_answer": "The corpus says memory usage was 'more than expected'; no GB figure is given.",
+      "expected_route": "investigation",
+      "rationale": "Same underlying incident as 'embedding-worker-memory', but asks for a number the corpus never states.",
+      "evidence": ["The embedding service was consuming more memory than expected."]
+    },
+    {
+      "id": "checkout-runbook-secondary-step",
+      "category": "ambiguous",
+      "collection": "documentation",
+      "question": "According to the runbook, what should be checked second if the payment adapter is not null but checkout still fails?",
+      "expected_answer": "The runbook is a single sentence covering only the payment-adapter-null check; it has no second step.",
+      "expected_route": "investigation",
+      "rationale": "The one real sentence in this document will be retrieved (high similarity to 'checkout' + '500'), but it answers a different, narrower question than the one asked.",
+      "evidence": ["If checkout returns 500, check the payment adapter for null handling."]
+    },
+    {
+      "id": "sso-doc-location-and-owner",
+      "category": "ambiguous",
+      "collection": "conversations",
+      "question": "Where is the SSO configuration documentation stored, and who is responsible for keeping it updated?",
+      "expected_answer": "The corpus says documentation for configuring SSO was added, but does not say where it lives or who owns it.",
+      "expected_route": "investigation",
+      "rationale": "Same underlying incident as 'sso-login-failure', but asks for details (location, ownership) the corpus never states.",
+      "evidence": ["Added documentation for configuring [SSO]"]
+    },
+    {
+      "id": "incidents-api-fix-deployed-when",
+      "category": "ambiguous",
+      "collection": "documentation+conversations",
+      "question": "On what date was the incidents API date-filter fix deployed to production?",
+      "expected_answer": "The corpus describes the bug and its fix, but does not state a deployment date.",
+      "expected_route": "investigation",
+      "rationale": "Same underlying incident as 'incidents-api-500', but asks for a fact (deployment date) never ingested.",
+      "evidence": ["Fixed the query validation logic.", "Added regression tests for date filtering."]
+    },
+    {
+      "id": "neg-parental-leave",
+      "category": "no-information",
+      "collection": "none",
+      "question": "What is our company's parental leave policy and how many weeks are paid?",
+      "expected_answer": "Not answerable -- no HR/benefits content of any kind is ingested into this organization.",
+      "expected_route": "investigation",
+      "rationale": "Verified in tests/rag_validation/rag_dataset.json against the same corpus."
+    },
+    {
+      "id": "neg-world-cup",
+      "category": "no-information",
+      "collection": "none",
+      "question": "Who won the 2022 FIFA World Cup final and what was the score?",
+      "expected_answer": "Not answerable from this corpus -- completely out of domain.",
+      "expected_route": "investigation",
+      "rationale": "Verified in tests/rag_validation/rag_dataset.json against the same corpus."
+    },
+    {
+      "id": "neg-k8s-autoscaling",
+      "category": "no-information",
+      "collection": "none",
+      "question": "What are the Kubernetes horizontal pod autoscaler CPU thresholds configured for the checkout service?",
+      "expected_answer": "Not answerable -- no Kubernetes or autoscaling content is ingested.",
+      "expected_route": "investigation",
+      "rationale": "Domain-adjacent and plausible-sounding on purpose -- verified in tests/rag_validation/rag_dataset.json against the same corpus."
+    },
+    {
+      "id": "neg-aws-spend",
+      "category": "no-information",
+      "collection": "none",
+      "question": "How much did we spend on AWS infrastructure in Q3 2025, and which service cost the most?",
+      "expected_answer": "Not answerable -- no billing, cost, or cloud-spend data is ingested.",
+      "expected_route": "investigation",
+      "rationale": "Domain-adjacent and plausible-sounding on purpose -- verified in tests/rag_validation/rag_dataset.json against the same corpus."
+    },
+    {
+      "id": "neg-database-vendor-pricing",
+      "category": "no-information",
+      "collection": "none",
+      "question": "What is our current negotiated pricing tier with our database vendor?",
+      "expected_answer": "Not answerable -- no vendor pricing or contract data is ingested.",
+      "expected_route": "investigation",
+      "rationale": "Domain-adjacent (this corpus does discuss a real Alembic/Postgres migration incident) but no commercial/pricing content exists."
+    },
+    {
+      "id": "neg-oncall-rotation",
+      "category": "no-information",
+      "collection": "none",
+      "question": "Who is currently on-call this week for the platform team?",
+      "expected_answer": "Not answerable -- no on-call schedule or roster data is ingested.",
+      "expected_route": "investigation",
+      "rationale": "Domain-adjacent (incidents imply an on-call process exists) but no roster/schedule content was ever ingested."
+    },
+    {
+      "id": "neg-competitor-analysis",
+      "category": "no-information",
+      "collection": "none",
+      "question": "How does our product compare to our closest competitor's latest release?",
+      "expected_answer": "Not answerable -- no competitive analysis or market research content is ingested.",
+      "expected_route": "investigation",
+      "rationale": "Fully out of domain for an engineering-incident corpus."
+    },
+    {
+      "id": "neg-legal-contract-terms",
+      "category": "no-information",
+      "collection": "none",
+      "question": "What are the termination clauses in our vendor contract with AWS?",
+      "expected_answer": "Not answerable -- no legal or contract documents are ingested.",
+      "expected_route": "investigation",
+      "rationale": "Fully out of domain for an engineering-incident corpus."
+    },
+    {
+      "id": "neg-marketing-campaign-ctr",
+      "category": "no-information",
+      "collection": "none",
+      "question": "What was the click-through rate of our latest email marketing campaign?",
+      "expected_answer": "Not answerable -- no marketing or campaign performance data is ingested.",
+      "expected_route": "investigation",
+      "rationale": "Fully out of domain for an engineering-incident corpus."
+    },
+    {
+      "id": "neg-team-headcount",
+      "category": "no-information",
+      "collection": "none",
+      "question": "How many engineers are currently on the platform team?",
+      "expected_answer": "Not answerable -- no HR/org-chart or team-roster data is ingested.",
+      "expected_route": "investigation",
+      "rationale": "Domain-adjacent (incidents are clearly handled by *someone*) but no org-chart/headcount content exists."
+    }
+  ]
+}

@@ -28,11 +28,14 @@ plumbing rather than in any request path.
 
 from __future__ import annotations
 
+import inspect
+
 import pytest
 from arq.connections import RedisSettings
 from pydantic import RedisDsn, TypeAdapter
 
 from app.agents.workers.main import WorkerSettings as AgentsWorkerSettings
+from app.api import main as api_main
 from app.ingestion.workers.main import WorkerSettings as IngestionWorkerSettings
 
 _ALL_WORKERS = (IngestionWorkerSettings, AgentsWorkerSettings)
@@ -126,3 +129,31 @@ def test_both_workers_build_redis_settings_from_the_same_configured_url() -> Non
     ingestion = IngestionWorkerSettings.redis_settings
     agents = AgentsWorkerSettings.redis_settings
     assert (ingestion.host, ingestion.port) == (agents.host, agents.port)
+
+
+# --- producer/consumer queue agreement ------------------------------------
+
+
+def test_api_lifespan_enqueues_onto_the_ingestion_worker_queue() -> None:
+    """The tests above only check the two `WorkerSettings` classes against
+    each other -- they say nothing about whether `app.api.main`'s arq pool
+    (the thing `POST /tenancy/connectors/{id}/sync` actually enqueues onto)
+    targets a queue either worker is listening to.
+
+    `arq.create_pool`'s own default (`default_queue_name="arq:queue"`) is
+    exactly the shared default both `WorkerSettings` classes above
+    deliberately opt out of -- so a pool created without an explicit
+    `default_queue_name` enqueues onto a queue neither worker polls, and a
+    connector "sync" click enqueues a job that sits in Redis forever,
+    silently never running. `run_ingestion_job_task` is the only function
+    the API's pool ever enqueues (`app.api.routers.tenancy.sync_connector`),
+    so the pool's queue must match the worker that registers that function.
+    """
+    source = inspect.getsource(api_main._lifespan)
+    assert 'default_queue_name="arq:queue:ingestion"' in source, (
+        "app.api.main's arq pool must pass default_queue_name="
+        f"{IngestionWorkerSettings.queue_name!r} to create_pool(...) -- "
+        "otherwise it silently falls back to arq's own default queue "
+        "('arq:queue'), which the ingestion worker never polls, and "
+        "connector syncs enqueue jobs that are never executed"
+    )

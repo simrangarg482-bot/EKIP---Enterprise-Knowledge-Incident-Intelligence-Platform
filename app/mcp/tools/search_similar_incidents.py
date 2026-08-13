@@ -24,7 +24,15 @@ from app.shared.schemas import Identity
 
 @mcp_server.tool()
 async def search_similar_incidents(description: str, ctx: Context) -> list[dict[str, Any]]:
-    """`{description: str}` -> `list[ScoredChunk]` (serialized)."""
+    """Find past EKIP incidents whose symptoms resemble the given
+    description, e.g. "checkout returning 500 errors" or "payments API
+    timing out after deploy". Use this to check whether something similar
+    has happened before, rather than `ask_question` when the user
+    specifically wants a list of comparable past incidents rather than a
+    synthesized answer.
+
+    Returns: `{description: str}` -> `list[ScoredChunk]` (serialized).
+    """
     raw_token = extract_bearer_token(ctx)
 
     async def handler(session: AsyncSession, identity: Identity) -> list[dict[str, Any]]:

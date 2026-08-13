@@ -23,24 +23,17 @@ projects, SSO configuration, access rules, invitations -- the rest of
 integration-gaps pass that added project-scoped RBAC and logout-everywhere),
 and users (`/users/{user_id}/logout-all` -- the admin-triggered session
 revocation counterpart to `/auth/logout-all`).
-
-**OTel tracing (Advanced Features Roadmap Phase 1, "OTel tracing (2.3)"):**
-`create_app()` calls `app.shared.config.tracing.configure_tracing()` and
-instruments the app with `FastAPIInstrumentor`, giving every request its own
-root span -- the `agent.*` spans `agents.graph`'s nodes create (via
-`agents.tracing.traced_node`) nest underneath it automatically (OTel Python
-propagates the active span via `contextvars`, which `async`/`await`
-preserves across the whole request), so a single request's full span tree
-(HTTP request -> retrieval -> confidence -> answer/investigation) is visible
-in one trace. This module does not call `configure_logging()` -- a
-pre-existing gap (nothing here ever has) left as-is, out of this change's
-scope; `configure_tracing()` has no such dependency on it.
 """
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from arq import create_pool
+from arq.connections import RedisSettings
 from fastapi import FastAPI
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import ekip_error_handler
 from app.api.routers import (
@@ -54,13 +47,51 @@ from app.api.routers import (
     users,
 )
 from app.core.exceptions import EKIPError
-from app.shared.config.tracing import configure_tracing
+from app.shared.config.settings import get_settings
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Owns the one `arq` Redis pool this process uses to *enqueue* jobs
+    (`POST /tenancy/connectors/{id}/sync`, `app.api.deps.get_arq_pool`) --
+    not to run them. Running jobs is `scripts/ingestion_worker.py`'s /
+    `app.ingestion.workers.main.WorkerSettings`'s job, a separate process,
+    exactly as `app.ingestion.workers.main`'s own docstring already
+    establishes (ENGINEERING_DECISIONS.md #002: API server and worker are
+    separate processes sharing one Redis queue, not one process doing both).
+    Built from the same `Settings.redis_url` that worker already reads, so
+    there is one source of truth for the connection string, not a second one
+    hand-maintained here.
+
+    `default_queue_name` must match `app.ingestion.workers.main.WorkerSettings
+    .queue_name` ("arq:queue:ingestion"), the only worker that registers
+    `run_ingestion_job_task` -- the sole function this pool ever enqueues.
+    Without it, `create_pool` falls back to arq's own hardcoded default
+    ("arq:queue"), which no worker polls (both workers opted out of that
+    default for the queue-collision reason documented on their own
+    `queue_name` attributes), so every job enqueued here would sit in Redis
+    forever and connector syncs would silently never run.
+    """
+    app.state.arq_pool = await create_pool(
+        RedisSettings.from_dsn(str(get_settings().redis_url)),
+        default_queue_name="arq:queue:ingestion",
+    )
+    try:
+        yield
+    finally:
+        await app.state.arq_pool.close()
 
 
 def create_app() -> FastAPI:
-    configure_tracing()
+    app = FastAPI(title="EKIP API", version="0.1.0", lifespan=_lifespan)
 
-    app = FastAPI(title="EKIP API", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     app.add_exception_handler(EKIPError, ekip_error_handler)
 
@@ -73,8 +104,6 @@ def create_app() -> FastAPI:
     app.include_router(tenancy.router)
     app.include_router(tenancy.admin_router)
     app.include_router(users.router)
-
-    FastAPIInstrumentor.instrument_app(app)
 
     return app
 

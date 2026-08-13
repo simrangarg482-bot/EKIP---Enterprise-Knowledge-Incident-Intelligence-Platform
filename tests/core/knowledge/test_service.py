@@ -32,6 +32,8 @@ class _FakeRow:
         self.title: str | None = kwargs.get("title", "A runbook")  # type: ignore[assignment]
         self.status: str = kwargs.get("status", "proposed")  # type: ignore[assignment]
         self.version: int = kwargs.get("version", 1)  # type: ignore[assignment]
+        self.source: str = kwargs.get("source", "manual")  # type: ignore[assignment]
+        self.source_url: str | None = kwargs.get("source_url")
         self.deleted_at = kwargs.get("deleted_at")
         self.created_at = kwargs.get("created_at", now)
         self.updated_at = kwargs.get("updated_at", now)

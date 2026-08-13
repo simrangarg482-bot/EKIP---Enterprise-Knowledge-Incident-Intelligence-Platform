@@ -1,0 +1,443 @@
+{
+  "generated_at": "2026-08-13T06:57:11.616294+00:00",
+  "organization": {
+    "slug": "test-org",
+    "name": "Test Org"
+  },
+  "current_default_threshold": 0.6,
+  "excluded_count": 0,
+  "best_threshold": 0.4,
+  "best_threshold_metrics": {
+    "precision": 0.5384615384615384,
+    "recall": 1.0,
+    "f1": 0.7000000000000001,
+    "accuracy": 0.6666666666666666
+  },
+  "threshold_sweep": [
+    {
+      "threshold": 0.4,
+      "tp": 14,
+      "fp": 12,
+      "fn": 0,
+      "tn": 10,
+      "precision": 0.5384615384615384,
+      "recall": 1.0,
+      "f1": 0.7000000000000001,
+      "accuracy": 0.6666666666666666
+    },
+    {
+      "threshold": 0.45,
+      "tp": 13,
+      "fp": 12,
+      "fn": 1,
+      "tn": 10,
+      "precision": 0.52,
+      "recall": 0.9285714285714286,
+      "f1": 0.6666666666666666,
+      "accuracy": 0.6388888888888888
+    },
+    {
+      "threshold": 0.5,
+      "tp": 12,
+      "fp": 12,
+      "fn": 2,
+      "tn": 10,
+      "precision": 0.5,
+      "recall": 0.8571428571428571,
+      "f1": 0.631578947368421,
+      "accuracy": 0.6111111111111112
+    },
+    {
+      "threshold": 0.55,
+      "tp": 12,
+      "fp": 12,
+      "fn": 2,
+      "tn": 10,
+      "precision": 0.5,
+      "recall": 0.8571428571428571,
+      "f1": 0.631578947368421,
+      "accuracy": 0.6111111111111112
+    },
+    {
+      "threshold": 0.6,
+      "tp": 12,
+      "fp": 10,
+      "fn": 2,
+      "tn": 12,
+      "precision": 0.5454545454545454,
+      "recall": 0.8571428571428571,
+      "f1": 0.6666666666666665,
+      "accuracy": 0.6666666666666666
+    },
+    {
+      "threshold": 0.65,
+      "tp": 12,
+      "fp": 10,
+      "fn": 2,
+      "tn": 12,
+      "precision": 0.5454545454545454,
+      "recall": 0.8571428571428571,
+      "f1": 0.6666666666666665,
+      "accuracy": 0.6666666666666666
+    },
+    {
+      "threshold": 0.7,
+      "tp": 11,
+      "fp": 10,
+      "fn": 3,
+      "tn": 12,
+      "precision": 0.5238095238095238,
+      "recall": 0.7857142857142857,
+      "f1": 0.6285714285714286,
+      "accuracy": 0.6388888888888888
+    },
+    {
+      "threshold": 0.75,
+      "tp": 11,
+      "fp": 9,
+      "fn": 3,
+      "tn": 13,
+      "precision": 0.55,
+      "recall": 0.7857142857142857,
+      "f1": 0.6470588235294117,
+      "accuracy": 0.6666666666666666
+    },
+    {
+      "threshold": 0.8,
+      "tp": 1,
+      "fp": 1,
+      "fn": 13,
+      "tn": 21,
+      "precision": 0.5,
+      "recall": 0.07142857142857142,
+      "f1": 0.125,
+      "accuracy": 0.6111111111111112
+    }
+  ],
+  "questions": [
+    {
+      "id": "sso-login-failure",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7773067303109532,
+      "answer": "Users were unable to log in through Google Workspace SSO due to an incorrect redirect URI configured in the identity provider, which caused an OIDC callback URL mismatch . The issue was fixed by updating the OIDC configuration .",
+      "error": null
+    },
+    {
+      "id": "embedding-worker-memory",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7772811269597227,
+      "answer": "The application containers restarted due to excessive memory consumption by the document embedding workers . The configuration change that resolved the issue was reducing the worker concurrency from 10 to 4 .",
+      "error": null
+    },
+    {
+      "id": "incidents-api-500",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7775850714661486,
+      "answer": "The incidents API returns an HTTP 500 error when filtering by date range because the query builder was generating invalid SQL for empty date filters .",
+      "error": null
+    },
+    {
+      "id": "brute-force-login",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.6729412714894824,
+      "answer": "Multiple failed authentication attempts were detected, originating from an unknown IP address, which resulted in one user account being temporarily locked after 10 failed attempts . The investigation revealed that this activity was likely a brute force attack . To mitigate the issue, stricter rate limiting was added to the authentication endpoint .",
+      "error": null
+    },
+    {
+      "id": "alembic-lock-timeout",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7773712818199384,
+      "answer": "The Alembic database migration failed with a lock timeout because it was modifying a large table during peak traffic hours . The recommended solution was to schedule migrations during low traffic windows and use batch operations .",
+      "error": null
+    },
+    {
+      "id": "api-latency-analytics",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.9999110649219626,
+      "answer": "The API latency increase after the analytics deployment was caused by an inefficient database query introduced by the analytics service, specifically due to a missing database index on the user_activity table . It was resolved by adding a database index migration .",
+      "error": null
+    },
+    {
+      "id": "rag-retrieval-quality",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7776081529127968,
+      "answer": "The changes made to improve retrieval accuracy when the RAG system was returning irrelevant documents included reducing chunk size, adding metadata filtering, and adding cross encoder reranking .",
+      "error": null
+    },
+    {
+      "id": "checkout-500-runbook",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7681526462837883,
+      "answer": "Check the payment adapter for null handling .",
+      "error": null
+    },
+    {
+      "id": "deployment-version",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7699565221258149,
+      "answer": "Version 2.4.0 was deployed to production when the API latency problem began .",
+      "error": null
+    },
+    {
+      "id": "code-patch-config-purpose",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.42243208939614363,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "code-sample-with-temperature",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.751363225168685,
+      "answer": "The `sample_with_temperature` function picks the next predicted token by first applying a logarithmic transformation to the predicted probabilities and then scaling them by the temperature parameter. The function then selects the top `k` indices based on these probabilities and randomly chooses one of these indices according to their normalized probabilities .",
+      "error": null
+    },
+    {
+      "id": "code-keras-mismatch-commit",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7760825204367915,
+      "answer": "The fix committed for the Keras version mismatch in app.py was called \"Add FixedInputLayer to handle Keras version mismatch in app.py\" .",
+      "error": null
+    },
+    {
+      "id": "test1-docs-restructure",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7756231682486819,
+      "answer": "The 'Improve test-1 documentation and developer experience' change actually restructured the documentation into a proper `docs/` directory, which includes sections on introduction, installation, local development, repository structure, usage, testing, and troubleshooting .",
+      "error": null
+    },
+    {
+      "id": "readme-project-name",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.4539158922151478,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "python-version-conflict",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7222381272849492,
+      "answer": "The project requires Python version 3.11.9 .",
+      "error": null
+    },
+    {
+      "id": "tensorflow-keras-upgrade-reason",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.9996175502061315,
+      "answer": "The upgrade was necessary to support the modern model format due to a Keras version mismatch, specifically because the InputLayer in newer Keras saves 'batch_shape' and 'optional' attributes which older versions do not understand .",
+      "error": null
+    },
+    {
+      "id": "render-build-command-fix",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7691807835048563,
+      "answer": "I don't have enough grounded information from the available sources to answer this confidently.",
+      "error": null
+    },
+    {
+      "id": "force-python311-reason",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7753890376676875,
+      "answer": "The project forced Python 3.11 and removed pyproject.toml to ensure compatibility and possibly simplify the configuration .",
+      "error": null
+    },
+    {
+      "id": "startup-crash-root-cause",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7592472553400732,
+      "answer": "The root cause of the startup crash was related to deferring model/tokenizer loading with caching .",
+      "error": null
+    },
+    {
+      "id": "rag-chunk-size-exact-value",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.572937741149942,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "alembic-exact-maintenance-window",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.5722587905918991,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "brute-force-source-ip",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7754045912129555,
+      "answer": "I don't have enough grounded information from the available sources to answer this confidently.",
+      "error": null
+    },
+    {
+      "id": "embedding-worker-exact-memory-gb",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7761551348462351,
+      "answer": "I don't have enough grounded information from the available sources to answer this confidently.",
+      "error": null
+    },
+    {
+      "id": "checkout-runbook-secondary-step",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.758638547979041,
+      "answer": "I don't have enough grounded information from the available sources to answer this confidently.",
+      "error": null
+    },
+    {
+      "id": "sso-doc-location-and-owner",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7533078289670726,
+      "answer": "I don't have enough grounded information from the available sources to answer this confidently.",
+      "error": null
+    },
+    {
+      "id": "incidents-api-fix-deployed-when",
+      "category": "ambiguous",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7722033245270042,
+      "answer": "I don't have enough grounded information from the available sources to answer this confidently.",
+      "error": null
+    },
+    {
+      "id": "neg-parental-leave",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.3889344841281954,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-world-cup",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.3905653459576398,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-k8s-autoscaling",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.3889253672913254,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-aws-spend",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.38901222240721567,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-database-vendor-pricing",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.38890034313322563,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-oncall-rotation",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.38890756192933174,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-competitor-analysis",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.3889267133697089,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-legal-contract-terms",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.3888988233465785,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-marketing-campaign-ctr",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.3889318734293207,
+      "answer": null,
+      "error": null
+    },
+    {
+      "id": "neg-team-headcount",
+      "category": "no-information",
+      "expected_route": "investigation",
+      "actual_route_at_current_default": "investigation",
+      "confidence_score": 0.3889232498442219,
+      "answer": null,
+      "error": null
+    }
+  ]
+}

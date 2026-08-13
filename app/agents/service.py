@@ -56,23 +56,6 @@ factored into `_run_graph_and_record` rather than duplicated -- the same
 DRY reasoning `core/incidents/repository.py`'s module docstring gives for
 its own generic `**fields` updaters.
 
-**Model routing (Advanced Features Roadmap Phase 1, "Model routing (2.4)")**:
-`answer_question`/`triage_incident` no longer call `get_llm()` themselves --
-`build_graph(session)`/`build_investigation_graph(session)` (`agents.graph`)
-now resolve each node's own task-tier client internally, since routing only
-takes effect if different nodes can end up on different `ChatOpenAI`
-instances within one request (see `agents.llm`'s module docstring).
-`generate_postmortem`/`detect_knowledge_gaps` are not graph-based, so they
-still call `get_llm(task=...)` directly here, exactly as before, just with
-an explicit task name now instead of an implicit shared default.
-
-`_run_graph_and_record`, `generate_postmortem`, and `detect_knowledge_gaps`
-each wrap their own work in `agents.llm.start_usage_tracking()` /
-`get_tracked_usage()`, recording the resulting `model_used`/token counts
-onto the same `agent_executions` row this module already writes --
-`_usage_update_fields()` below is the one shared mapping from tracked usage
-records to those four column names, used by all three.
-
 `search_similar_incidents`/`search_recent_changes` (added for Milestone 8's
 MCP tool handlers, API_DESIGN.md section 3) are thin `retrieval.search`
 passthroughs that resolve `SearchFilters` from `actor` before calling in --
@@ -113,10 +96,10 @@ from app.agents import repository
 from app.agents.graph import GraphState, build_graph, build_investigation_graph
 from app.agents.knowledge_gap import repository as knowledge_gap_repository
 from app.agents.knowledge_gap.pipeline import detect_knowledge_gaps as _run_knowledge_gap_pipeline
-from app.agents.llm import get_llm, get_tracked_usage, start_usage_tracking
+from app.agents.llm import get_llm
 from app.agents.postmortem.pipeline import run_postmortem_pipeline
-from app.agents.schemas import AgentExecutionStats
-from app.core.exceptions import EKIPError
+from app.agents.schemas import AgentExecution, AgentExecutionStats
+from app.core.exceptions import EKIPError, PermissionDeniedError
 from app.core.incidents import service as incidents_service
 from app.core.incidents.schemas import ActionItem
 from app.core.users.service import require_permission
@@ -168,7 +151,8 @@ async def answer_question(
     the only trigger source honestly true of any caller today. Whichever of
     those is built first should pass its own real value explicitly.
     """
-    graph = build_graph(session)
+    llm = get_llm()
+    graph = build_graph(session, llm)
     initial_state = GraphState(query=query, incident_id=incident_id, actor=actor)
 
     return await _run_graph_and_record(
@@ -216,7 +200,8 @@ async def triage_incident(
     )
     query = f"{incident.title}\n\n{incident.description}"
 
-    graph = build_investigation_graph(session)
+    llm = get_llm()
+    graph = build_investigation_graph(session, llm)
     initial_state = GraphState(query=query, incident_id=incident_id, actor=actor)
 
     return await _run_graph_and_record(
@@ -274,13 +259,12 @@ async def generate_postmortem(
         input_summary={"incident_id": str(incident_id)},
     )
 
-    start_usage_tracking()
     try:
         timeline_entries = await incidents_service.get_timeline(
             session, actor, actor.organization_id, incident_id
         )
 
-        llm = get_llm("postmortem")
+        llm = get_llm()
         root_cause, action_items = await run_postmortem_pipeline(llm, timeline_entries)
     except Exception as exc:
         await repository.update_agent_execution(
@@ -289,7 +273,6 @@ async def generate_postmortem(
             status="failed",
             error_detail=str(exc)[:2000],
             completed_at=datetime.now(timezone.utc),
-            **_usage_update_fields(),
         )
         raise
 
@@ -298,7 +281,6 @@ async def generate_postmortem(
         execution.id,
         status="succeeded",
         completed_at=datetime.now(timezone.utc),
-        **_usage_update_fields(),
     )
     return root_cause, action_items
 
@@ -324,12 +306,7 @@ async def search_similar_incidents(
     all-collections default) instead -- a real, flagged gap versus the
     documented contract's literal wording, not a silent workaround.
     """
-    # project_ids restricted per `Identity.resolve_search_scope` when the
-    # actor holds project-scoped memberships (see that docstring); the
-    # `permission_codes` omission here is pre-existing, separate behavior
-    # this fix does not change.
-    project_ids, _ = actor.resolve_search_scope()
-    filters = SearchFilters(organization_id=actor.organization_id, project_ids=project_ids)
+    filters = SearchFilters(organization_id=actor.organization_id)
     return await retrieval_service.search(session, description, filters, top_k)
 
 
@@ -341,6 +318,7 @@ async def search_recent_changes(
     since: datetime | None = None,
     top_k: int = 10,
     collection: CollectionName = "code",
+    repository: str | None = None,
 ) -> list[ScoredChunk]:
     """Search for recent code/documentation changes matching `query`
     (API_DESIGN.md section 3's `search_recent_changes` MCP tool:
@@ -357,12 +335,18 @@ async def search_recent_changes(
     chunk whose metadata carries none of those keys is kept rather than
     dropped, since "no timestamp available" is not the same claim as "not
     recent."
+
+    `repository`, if given, restricts results to one GitHub repo (e.g.
+    `"owner/name"`) via `SearchFilters.repository` -- valid for `collection
+    == "code"` (the default here) or `"documentation"` (most real GitHub
+    connector output -- issues, PRs, commit messages, READMEs -- lands
+    there, not in `"code"`); `PgVectorStore` raises for `"conversations"`,
+    which carries no `repo_full_name` to filter on. A repo with no source
+    files (nothing in `code_chunks`) needs an explicit `collection=
+    "documentation"` call to be found at all -- this function's own
+    `collection="code"` default won't surface it.
     """
-    # See `search_similar_incidents` above: project_ids restricted per
-    # `Identity.resolve_search_scope`; `permission_codes` omission is
-    # pre-existing, separate behavior this fix does not change.
-    project_ids, _ = actor.resolve_search_scope()
-    filters = SearchFilters(organization_id=actor.organization_id, project_ids=project_ids)
+    filters = SearchFilters(organization_id=actor.organization_id, repository=repository)
     results = await retrieval_service.search(
         session, query, filters, top_k, collection, include_metadata=True
     )
@@ -385,6 +369,35 @@ def _passes_recency_filter(chunk: ScoredChunk, since: datetime) -> bool:
             timestamp = timestamp.replace(tzinfo=timezone.utc)
         return timestamp >= since
     return True
+
+
+async def get_question_history(
+    session: AsyncSession,
+    actor: Identity,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[AgentExecution]:
+    """Return `actor`'s own past `agent_executions` rows, newest first --
+    backs `GET /ask/history`. Requires `actor.user_id` (populated only for
+    `kind == USER` identities, per `Identity`'s own docstring): an MCP or
+    service caller has no per-user history to return, so that case is a hard
+    `PermissionDeniedError` rather than a silently empty list, which would
+    look identical to "you really have asked nothing yet."
+    """
+    if actor.user_id is None:
+        raise PermissionDeniedError(
+            "Question history is only available to authenticated users.",
+            error_code="agents.history_requires_user",
+        )
+    rows = await repository.list_agent_executions_for_user(
+        session,
+        user_id=actor.user_id,
+        organization_id=actor.organization_id,
+        limit=limit,
+        offset=offset,
+    )
+    return [AgentExecution.model_validate(row) for row in rows]
 
 
 def _gap_report_to_schema(row: KnowledgeGapReport) -> GapReport:
@@ -443,9 +456,8 @@ async def detect_knowledge_gaps(
         input_summary={"organization_id": str(actor.organization_id)},
     )
 
-    start_usage_tracking()
     try:
-        llm = get_llm("knowledge_gap")
+        llm = get_llm()
         rows = await _run_knowledge_gap_pipeline(
             session,
             llm,
@@ -462,7 +474,6 @@ async def detect_knowledge_gaps(
             status="failed",
             error_detail=str(exc)[:2000],
             completed_at=datetime.now(timezone.utc),
-            **_usage_update_fields(),
         )
         raise
 
@@ -471,7 +482,6 @@ async def detect_knowledge_gaps(
         execution.id,
         status="succeeded",
         completed_at=datetime.now(timezone.utc),
-        **_usage_update_fields(),
     )
     return [_gap_report_to_schema(row) for row in rows]
 
@@ -552,10 +562,10 @@ async def _run_graph_and_record(
         organization_id=initial_state.actor.organization_id,
         agent_name=agent_name,
         trigger_source=trigger_source,
+        user_id=initial_state.actor.user_id,
         input_summary=input_summary,
     )
 
-    start_usage_tracking()
     try:
         raw_final_state = await graph.ainvoke(initial_state)
     except EKIPError as exc:
@@ -565,7 +575,6 @@ async def _run_graph_and_record(
             status="failed",
             error_detail=str(exc)[:2000],
             completed_at=datetime.now(timezone.utc),
-            **_usage_update_fields(),
         )
         raise
     except Exception as exc:
@@ -582,7 +591,6 @@ async def _run_graph_and_record(
             status="failed",
             error_detail=str(exc)[:2000],
             completed_at=datetime.now(timezone.utc),
-            **_usage_update_fields(),
         )
         return AskResponse(
             confidence=0.0,
@@ -610,7 +618,6 @@ async def _run_graph_and_record(
             status="failed",
             error_detail="graph completed with no result",
             completed_at=datetime.now(timezone.utc),
-            **_usage_update_fields(),
         )
         return AskResponse(
             confidence=0.0,
@@ -625,45 +632,5 @@ async def _run_graph_and_record(
         status="succeeded",
         confidence_score=final_state.confidence_score,
         completed_at=datetime.now(timezone.utc),
-        **_usage_update_fields(),
     )
     return final_state.result
-
-
-def _usage_update_fields() -> dict[str, Any]:
-    """Map `agents.llm.get_tracked_usage()`'s records onto the
-    `agent_executions` column names this module writes to
-    (`model_used`/`prompt_tokens`/`completion_tokens`/`total_tokens`) --
-    the one shared conversion `_run_graph_and_record`, `generate_postmortem`,
-    and `detect_knowledge_gaps` all use, called right before each of their
-    own `update_agent_execution` calls (success or failure alike -- a run
-    that failed partway through may still have made real, billable LLM
-    calls worth recording).
-
-    `model_used` is every *distinct* model seen across the tracked calls,
-    comma-joined and sorted for a deterministic value -- see
-    `AgentExecution.model_used`'s own docstring for why this is a list, not
-    a single value. Every field is `None` (not `0`/`""`) when no LLM call
-    was tracked at all (e.g. a graph run that failed before its first node),
-    matching this module's existing "no data" convention for optional
-    columns elsewhere (`confidence_score`, `error_detail`, ...).
-    """
-    records = get_tracked_usage()
-    if not records:
-        return {
-            "model_used": None,
-            "prompt_tokens": None,
-            "completion_tokens": None,
-            "total_tokens": None,
-        }
-
-    def _sum(attr: str) -> int | None:
-        values = [value for record in records if (value := getattr(record, attr)) is not None]
-        return sum(values) if values else None
-
-    return {
-        "model_used": ",".join(sorted({record.model for record in records})),
-        "prompt_tokens": _sum("input_tokens"),
-        "completion_tokens": _sum("output_tokens"),
-        "total_tokens": _sum("total_tokens"),
-    }

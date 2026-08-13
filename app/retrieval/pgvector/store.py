@@ -36,6 +36,26 @@ _COLLECTION_MODELS: dict[CollectionName, type] = {
 }
 
 
+_REPO_SCOPED_COLLECTIONS: frozenset[CollectionName] = frozenset({"code", "documentation"})
+
+
+def _repository_filter_clause(collection: CollectionName, model: type, repository: str):
+    """`SearchFilters.repository`'s WHERE clause -- only `CodeChunk`/
+    `DocumentationChunk` carry a `repo_full_name` column (real GitHub
+    connector output lands in both -- source files in `"code"`, but
+    issues/PRs/commit messages/READMEs, which is most of what a typical
+    repo actually produces, in `"documentation"`). `ConversationChunk` has
+    no such column, so filtering by repository there is a caller error, not
+    a silent no-op.
+    """
+    if collection not in _REPO_SCOPED_COLLECTIONS:
+        raise ValueError(
+            f"SearchFilters.repository is only supported for the 'code' and "
+            f"'documentation' collections, got collection={collection!r}."
+        )
+    return model.repo_full_name == repository
+
+
 class PgVectorStore:
     """The pgvector `VectorStore` implementation. Stateless (holds no
     per-instance connection or config) -- every method takes the session
@@ -99,6 +119,8 @@ class PgVectorStore:
         )
         if filters.project_ids is not None:
             stmt = stmt.where(model.project_id.in_(filters.project_ids))
+        if filters.repository is not None:
+            stmt = stmt.where(_repository_filter_clause(collection, model, filters.repository))
 
         stmt = stmt.order_by(distance.asc()).limit(top_k)
 
@@ -171,6 +193,8 @@ class PgVectorStore:
         )
         if filters.project_ids is not None:
             stmt = stmt.where(model.project_id.in_(filters.project_ids))
+        if filters.repository is not None:
+            stmt = stmt.where(_repository_filter_clause(collection, model, filters.repository))
 
         stmt = stmt.order_by(rank.desc()).limit(top_k)
 
@@ -243,7 +267,7 @@ class PgVectorStore:
 
         model = _COLLECTION_MODELS[collection]
         for chunk, embedding in zip(chunks, embeddings, strict=True):
-            stmt = pg_insert(model).values(
+            values = dict(
                 organization_id=chunk.organization_id,
                 project_id=chunk.project_id,
                 document_id=chunk.document_id,
@@ -254,17 +278,23 @@ class PgVectorStore:
                 source_offset_end=chunk.source_offset_end,
                 acl_permission_code=chunk.acl_permission_code,
             )
+            update_columns = [
+                "organization_id",
+                "project_id",
+                "content",
+                "embedding",
+                "source_offset_start",
+                "source_offset_end",
+                "acl_permission_code",
+            ]
+            if collection in _REPO_SCOPED_COLLECTIONS:
+                values["repo_full_name"] = chunk.repo_full_name
+                update_columns.append("repo_full_name")
+
+            stmt = pg_insert(model).values(**values)
             stmt = stmt.on_conflict_do_update(
                 index_elements=["document_id", "chunk_index"],
-                set_={
-                    "organization_id": stmt.excluded.organization_id,
-                    "project_id": stmt.excluded.project_id,
-                    "content": stmt.excluded.content,
-                    "embedding": stmt.excluded.embedding,
-                    "source_offset_start": stmt.excluded.source_offset_start,
-                    "source_offset_end": stmt.excluded.source_offset_end,
-                    "acl_permission_code": stmt.excluded.acl_permission_code,
-                },
+                set_={column: getattr(stmt.excluded, column) for column in update_columns},
             )
             await session.execute(stmt)
         await session.flush()

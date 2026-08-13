@@ -63,6 +63,12 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Set only for an account created via email/password signup
+    #: (`core.auth.service.signup`) -- an SSO-provisioned user has no local
+    #: credential at all, so this stays `NULL` for them; `login_with_password`
+    #: treats a `NULL` hash as "not a password-auth account" and rejects the
+    #: same generic way it rejects a wrong password (no user enumeration).
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

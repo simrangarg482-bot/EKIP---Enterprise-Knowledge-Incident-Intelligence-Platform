@@ -165,6 +165,9 @@ capability, which is the over-engineering this design explicitly avoids.
 
 **Date:** 2026-08-01
 
+**Update (2026-08-13) — benchmarked against `BAAI/bge-base-en-v1.5`, no meaningful difference found:**
+Per this entry's own "revisitable once real query/retrieval data exists to benchmark against," `scripts/eval_embedding_models.py` ran both models against the 36-question golden set (`scripts/eval_confidence_dataset.json`) over `test-org`'s real ingested corpus (93 chunks across documentation/code/conversations). Result: **identical** retrieval recall@5 (0.885 over the 26 questions with real evidence to retrieve) and **identical** clear-answer answer-grounding rate (0.857) for both models — full report in `scripts/eval_embedding_models_report.json`. The two models even missed the exact same three questions. This is a ceiling effect, not evidence the candidate has no advantage: a 93-chunk corpus is small enough that top-5 retrieval is close to saturated for both models — there simply isn't enough corpus size or query difficulty at this scale to separate a 384-dim and a 768-dim model. The comparison also surfaced that the current failure mode (a 0.25 grounded rate on `ambiguous` questions — i.e. the pipeline confidently answers 3 of 12 questions the corpus can't actually support) is identical for both models too, meaning it's an answer-generation/prompt issue, not a retrieval-ranking one, and won't be fixed by an embedding-model change either way. **No migration to `bge-base-en-v1.5` is warranted from this evidence** — re-run this benchmark if/when the real ingested corpus grows large enough that retrieval depth becomes a genuine bottleneck.
+
 ---
 
 ## 007 — Document-level ACL: a single optional permission-code gate, not a grant table

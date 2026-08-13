@@ -59,7 +59,7 @@ import uuid
 
 from fastapi import APIRouter
 
-from app.api.deps import CurrentIdentity, DbSession
+from app.api.deps import ArqPool, CurrentIdentity, DbSession
 from app.core.tenancy import service as tenancy_service
 from app.core.tenancy.schemas import (
     AccessRule,
@@ -89,6 +89,35 @@ async def register_connector(
 @router.get("/connectors", response_model=list[ConnectorConfig])
 async def list_connectors(actor: CurrentIdentity, session: DbSession) -> list[ConnectorConfig]:
     return await tenancy_service.list_connectors(session, actor, actor.organization_id)
+
+
+@router.post("/connectors/{connector_config_id}/sync", status_code=202)
+async def sync_connector(
+    connector_config_id: uuid.UUID, actor: CurrentIdentity, session: DbSession, arq_pool: ArqPool
+) -> dict[str, str]:
+    """Trigger an on-demand ingestion sync for one connector.
+
+    Previously, `run_ingestion_job`/`reindex` (`app.ingestion.service`) had
+    no REST or MCP caller at all -- reachable only from `scheduled_
+    reconciliation`'s hourly cron pass (`app.ingestion.workers.tasks`). This
+    is the missing producer side of that same, already-real consumer: it
+    enqueues the exact same `run_ingestion_job_task` the cron job enqueues
+    (`app.ingestion.workers.tasks`), onto the same `arq` queue the
+    already-running worker process consumes -- no ingestion logic is
+    duplicated here, only the trigger.
+
+    `tenancy_service.get_connector` enforces ownership and `tenancy:manage`
+    before anything is enqueued, so this cannot be used to trigger a sync
+    for a connector outside the caller's own organization/project scope.
+    Returns `202` immediately -- the sync itself runs asynchronously in the
+    worker process; poll `GET /tenancy/connectors` and watch `last_synced_at`
+    /`status` to see it complete.
+    """
+    connector = await tenancy_service.get_connector(
+        session, actor, actor.organization_id, connector_config_id
+    )
+    await arq_pool.enqueue_job("run_ingestion_job_task", str(connector.id))
+    return {"status": "enqueued", "connector_config_id": str(connector.id)}
 
 
 admin_router = APIRouter(tags=["tenancy-admin"])

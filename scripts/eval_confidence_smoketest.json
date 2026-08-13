@@ -1,0 +1,222 @@
+{
+  "generated_at": "2026-08-13T08:00:47.318359+00:00",
+  "organization": {
+    "slug": "test-org",
+    "name": "Test Org"
+  },
+  "current_default_threshold": 0.6,
+  "excluded_count": 0,
+  "best_threshold": 0.65,
+  "best_threshold_metrics": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "accuracy": 1.0
+  },
+  "threshold_sweep": [
+    {
+      "threshold": 0.4,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "threshold": 0.45,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "threshold": 0.5,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "threshold": 0.55,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "threshold": 0.6,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "threshold": 0.65,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "threshold": 0.7,
+      "tp": 3,
+      "fp": 0,
+      "fn": 1,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
+      "accuracy": 0.75
+    },
+    {
+      "threshold": 0.75,
+      "tp": 3,
+      "fp": 0,
+      "fn": 1,
+      "tn": 0,
+      "precision": 1.0,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
+      "accuracy": 0.75
+    },
+    {
+      "threshold": 0.8,
+      "tp": 0,
+      "fp": 0,
+      "fn": 4,
+      "tn": 0,
+      "precision": null,
+      "recall": 0.0,
+      "f1": null,
+      "accuracy": 0.0
+    }
+  ],
+  "category_behavior": {
+    "per_category": {
+      "clear-answer": {
+        "count": 4,
+        "real_answer_rate": 1.0
+      }
+    },
+    "clear_answer_accuracy": 1.0,
+    "ambiguous_false_answer_rate": null,
+    "no_information_investigation_rate": null
+  },
+  "grounding": {
+    "per_category": {
+      "clear-answer": 0.9375
+    },
+    "headline_answer_grounding_rate": 0.9375
+  },
+  "confidence_by_category": {
+    "clear-answer": {
+      "min": 0.6729412714894824,
+      "max": 0.7775850714661486,
+      "mean": 0.7512785500565767,
+      "n": 4
+    }
+  },
+  "questions": [
+    {
+      "id": "sso-login-failure",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7773067303109532,
+      "is_real_answer": true,
+      "citations_count": 2,
+      "answer": "Users were unable to log in through Google Workspace SSO due to an incorrect redirect URI configured in the identity provider, which caused an OIDC callback URL mismatch . The issue was fixed by updating the OIDC configuration .",
+      "error": null
+    },
+    {
+      "id": "embedding-worker-memory",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7772811269597227,
+      "is_real_answer": true,
+      "citations_count": 2,
+      "answer": "The application containers restarted due to excessive memory consumption by the document embedding workers . The configuration change that resolved the issue was reducing the worker concurrency from 10 to 4 .",
+      "error": null
+    },
+    {
+      "id": "incidents-api-500",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.7775850714661486,
+      "is_real_answer": true,
+      "citations_count": 1,
+      "answer": "The incidents API returns an HTTP 500 error when filtering by date range because the query builder was generating invalid SQL for empty date filters .",
+      "error": null
+    },
+    {
+      "id": "brute-force-login",
+      "category": "clear-answer",
+      "expected_route": "answer",
+      "actual_route_at_current_default": "answer",
+      "confidence_score": 0.6729412714894824,
+      "is_real_answer": true,
+      "citations_count": 2,
+      "answer": "Multiple failed authentication attempts were detected, leading to one user account being temporarily locked after 10 failed attempts . The investigation revealed that the activity originated from an unknown IP address and was identified as a possible brute force attack . To mitigate this issue, stricter rate limiting was added to the authentication endpoint .",
+      "error": null
+    }
+  ],
+  "grounding_traces": [
+    {
+      "id": "sso-login-failure",
+      "category": "clear-answer",
+      "sentence_count": 2,
+      "grounded_count": 2,
+      "grounded_ratio": 1.0,
+      "error": null
+    },
+    {
+      "id": "embedding-worker-memory",
+      "category": "clear-answer",
+      "sentence_count": 2,
+      "grounded_count": 2,
+      "grounded_ratio": 1.0,
+      "error": null
+    },
+    {
+      "id": "incidents-api-500",
+      "category": "clear-answer",
+      "sentence_count": 1,
+      "grounded_count": 1,
+      "grounded_ratio": 1.0,
+      "error": null
+    },
+    {
+      "id": "brute-force-login",
+      "category": "clear-answer",
+      "sentence_count": 4,
+      "grounded_count": 3,
+      "grounded_ratio": 0.75,
+      "error": null
+    }
+  ]
+}

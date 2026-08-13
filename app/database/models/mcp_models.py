@@ -74,3 +74,51 @@ class McpRequest(Base):
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class OAuthClient(Base):
+    """A dynamically-registered MCP OAuth client (RFC 7591), persisted so a
+    server restart does not orphan a remote MCP client's (e.g. Claude's)
+    long-lived `client_id`/`client_secret`/refresh token -- see
+    `app.mcp.oauth.provider`'s module docstring for the gap this closes: that
+    provider used to hold registered clients in a plain in-memory `dict`,
+    which every server restart during this project's own Claude-integration
+    testing emptied out from under an already-connected client.
+
+    Deliberately NOT organization-scoped and NOT RLS-protected -- the same
+    reasoning `Role`/`Permission` (core_models.py) already establish for a
+    platform-wide catalog: an OAuth client (Claude itself, as a piece of
+    software) is not a member of any one organization. Which organization a
+    given authorization grant is *for* is decided per `/authorize` call
+    (`EkipOAuthProvider.authorize`'s human confirmation step), not by which
+    client registered -- the resulting session (a real `refresh_tokens` row)
+    remains exactly as organization-scoped and RLS-protected as any other.
+
+    `client_metadata` is the full RFC 7591 client metadata (everything
+    `OAuthClientInformationFull` carries except `client_id`/`client_secret`/
+    `client_id_issued_at`/`client_secret_expires_at`, which get their own
+    columns) stored as one JSONB blob rather than exploded column-by-column
+    -- the same choice `mcp_requests.request_summary` makes for a
+    self-contained, SDK-owned shape this table never needs to query into.
+
+    `client_secret_encrypted` is envelope-encrypted (`app.shared.security.
+    envelope`), not hashed: unlike a password, `mcp.server.auth.middleware.
+    client_auth.ClientAuthenticator` (the `mcp` package's own `/token`
+    client-authentication check) compares the *plaintext* secret via
+    `hmac.compare_digest` against whatever this table's caller returns from
+    `get_client()` -- a one-way hash cannot support that comparison, so
+    reversible encryption (the same mechanism `connector_configs.
+    credential_ref` already uses for an identical "must get the plaintext
+    back" requirement) is the correct choice, not a shortcut.
+    """
+
+    __tablename__ = "oauth_clients"
+
+    client_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    client_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    client_secret_expires_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    client_id_issued_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    client_metadata: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

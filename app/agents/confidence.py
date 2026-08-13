@@ -119,6 +119,9 @@ def evaluate_confidence(state: GraphState) -> dict[str, Any]:
     # `state.confidence_signals` -- nothing does yet, see module docstring.
 
     confidence_score = _weighted_score(signals)
+    # `confidence_threshold`'s default is evaluated, not guessed -- see
+    # `scripts/eval_confidence.py` and the evidence comment on this field in
+    # `app/shared/config/settings.py` before changing it.
     threshold = get_settings().confidence_threshold
     route: Literal["answer", "investigation"] = (
         "answer" if confidence_score >= threshold else "investigation"

@@ -53,27 +53,60 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
+import bcrypt
 import httpx
 from jose import JWTError, jwt as jose_jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import repository
 from app.core.auth.schemas import (
+    LoginRequest,
     RefreshRequest,
     SessionTokens,
+    SignupRequest,
     SSOAuthorizationRedirect,
     SSOCallbackRequest,
     TokenClaims,
     VerifiedIdPClaims,
 )
-from app.core.exceptions import PermissionDeniedError
+from app.core.exceptions import ConflictError, PermissionDeniedError
 from app.core.tenancy import service as tenancy_service
-from app.core.tenancy.schemas import SSOConfiguration
+from app.core.tenancy.schemas import OrganizationCreate, SSOConfiguration
 from app.core.users import service as users_service
 from app.database.session import set_tenant_context
 from app.shared.config.logging import get_logger
 from app.shared.config.settings import get_settings
 from app.shared.security import decrypt_secret, get_kms
+
+def _hash_password(password: str) -> str:
+    """Hash a plaintext password for `users.password_hash` (email/password
+    auth path, `signup`/`login_with_password`).
+
+    Calls the `bcrypt` package directly rather than through `passlib`
+    (`passlib[bcrypt]` is still the declared dependency, pyproject.toml):
+    the installed `bcrypt` (5.x) removed the `__about__` attribute
+    `passlib==1.7.4`'s bcrypt-backend detection reads to calibrate itself,
+    which makes passlib's own self-test raise before ever hashing anything
+    -- a real, verified version incompatibility between those two packages'
+    currently-resolved versions, not something specific to this code. Since
+    `bcrypt` itself works correctly standalone, calling it directly avoids
+    the broken shim instead of pinning an older `bcrypt` to route around it.
+
+    bcrypt truncates its input at 72 bytes -- a property of the algorithm
+    itself, not a limitation added here; `SignupRequest.password`'s
+    `min_length=8` bounds the other end, but no maximum is enforced, so a
+    password longer than 72 bytes still hashes successfully, it just has
+    every byte past the 72nd silently ignored by the algorithm.
+    """
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
+
+
+def _verify_password(password: str, password_hash: str) -> bool:
+    """Verify a plaintext password against a hash `_hash_password` produced.
+    `bcrypt.checkpw` is constant-time; see `login_with_password`'s docstring
+    for what this function's result is and isn't safe to branch on.
+    """
+    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("ascii"))
 
 logger = get_logger(__name__)
 
@@ -231,6 +264,115 @@ async def complete_sso_login(
         "sso_login_completed",
         user_id=str(user_id),
         organization_id=str(sso_config.organization_id),
+    )
+    return tokens
+
+
+# --- Email/password auth: signup + login -----------------------------------------
+#
+# A second, parallel authentication mechanism alongside SSO -- not a
+# replacement for it, and not built by weakening it. Every function above
+# this section is untouched. This exists because EKIP's only login path
+# until now required a real OIDC identity provider already configured for an
+# organization (`sso_configurations`); a self-service user with no IdP of
+# their own has had no way to create an account at all. Both functions below
+# end by calling the exact same `_issue_session` every SSO login already
+# uses, so a password-authenticated session is indistinguishable, to every
+# downstream check (REST, MCP, RLS), from an SSO-authenticated one.
+
+
+async def signup(session: AsyncSession, data: SignupRequest) -> SessionTokens:
+    """Create a brand-new organization and its first (admin) user, and log
+    them in.
+
+    There is no "join an existing organization via signup" flow -- every
+    signup creates a fresh `organizations` row (reusing `core.tenancy.
+    service.create_organization`, the same function SSO auto-provisioning
+    and the dev bootstrap scripts already call) together with a "General"
+    default project. A second person joining that organization later is a
+    separate, already-built flow (`core.tenancy.service.create_invitation`/
+    `accept_invitation`), not something this function does.
+
+    Raises `ConflictError` if `data.email` already has an account (whether
+    password- or SSO-provisioned -- `get_credential_lookup` doesn't
+    distinguish, since "an account with this email exists" is true either
+    way) or if `data.organization_slug` is already taken (surfaced by
+    `create_organization` itself).
+    """
+    existing = await users_service.get_credential_lookup(session, data.email)
+    if existing is not None:
+        raise ConflictError(
+            "An account with this email already exists.",
+            error_code="auth.email_taken",
+            detail={"email": data.email},
+        )
+
+    organization = await tenancy_service.create_organization(
+        session,
+        OrganizationCreate(name=data.organization_name, slug=data.organization_slug),
+    )
+
+    user_id = await users_service.get_or_create_user(
+        session, email=data.email, display_name=data.display_name
+    )
+    await users_service.set_password(
+        session, user_id=user_id, password_hash=_hash_password(data.password)
+    )
+
+    role_id = await users_service.ensure_admin_role(session)
+    await users_service.assign_role(
+        session, user_id=user_id, organization_id=organization.id, role_id=role_id
+    )
+
+    tokens = await _issue_session(
+        session, user_id=user_id, organization_id=organization.id, family_id=uuid.uuid4()
+    )
+    logger.info(
+        "password_signup_completed",
+        user_id=str(user_id),
+        organization_id=str(organization.id),
+    )
+    return tokens
+
+
+async def login_with_password(session: AsyncSession, data: LoginRequest) -> SessionTokens:
+    """Authenticate with an email + password (`signup`'s counterpart).
+
+    A wrong password and an unknown/SSO-only (no password set) email both
+    fail identically -- a generic "invalid credentials" `PermissionDeniedError`
+    -- so this endpoint cannot be used to enumerate which emails have an
+    account. `CryptContext.verify` itself is timing-safe; the branches above
+    it are not constant-time relative to each other, but neither leaks
+    anything beyond "invalid," which is the only fact either branch reveals.
+    """
+    lookup = await users_service.get_credential_lookup(session, data.email)
+    if (
+        lookup is None
+        or lookup.password_hash is None
+        or not _verify_password(data.password, lookup.password_hash)
+    ):
+        raise PermissionDeniedError(
+            "Invalid email or password.", error_code="auth.invalid_credentials"
+        )
+    if not lookup.is_active:
+        raise PermissionDeniedError(
+            "This account is inactive.", error_code="user.inactive"
+        )
+
+    organization_id = await users_service.resolve_organization_for_login(session, lookup.user_id)
+    if organization_id is None:
+        raise PermissionDeniedError(
+            "This account is not a member of any organization.",
+            error_code="auth.no_organization",
+        )
+
+    tokens = await _issue_session(
+        session, user_id=lookup.user_id, organization_id=organization_id, family_id=uuid.uuid4()
+    )
+    logger.info(
+        "password_login_completed",
+        user_id=str(lookup.user_id),
+        organization_id=str(organization_id),
     )
     return tokens
 
@@ -479,6 +621,29 @@ async def _issue_session(
         refresh_token=raw_refresh_token,
         expires_in=int((access_expires_at - issued_at).total_seconds()),
     )
+
+
+async def peek_refresh_token(session: AsyncSession, raw_token: str):
+    """Look up a refresh token's owning row without rotating or revoking it.
+
+    Used by `app.mcp.oauth`'s `OAuthAuthorizationServerProvider.load_refresh_token`
+    (the MCP-OAuth bridge for Claude's remote connector) to answer "does this
+    refresh token exist, and is it still usable" -- the actual rotation and
+    reuse-detection still happens in `refresh()` when the token is later
+    exchanged, exactly as it would for a REST-originated refresh. Returns
+    `None` for the same three reasons `refresh()` itself would reject the
+    token (unknown, revoked, expired), just without consuming it.
+    """
+    token_hash = _hash_token(raw_token)
+    token_organization_id = await repository.resolve_refresh_token_organization_id(session, token_hash)
+    if token_organization_id is None:
+        return None
+    await set_tenant_context(session, token_organization_id)
+
+    row = await repository.get_refresh_token_by_hash(session, token_hash)
+    if row is None or row.revoked_at is not None or row.expires_at <= datetime.now(timezone.utc):
+        return None
+    return row
 
 
 async def refresh(session: AsyncSession, data: RefreshRequest) -> SessionTokens:

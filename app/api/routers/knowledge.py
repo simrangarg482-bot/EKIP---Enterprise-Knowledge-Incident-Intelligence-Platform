@@ -26,6 +26,7 @@ before a variable one that could otherwise swallow it).
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter
 
@@ -36,6 +37,23 @@ from app.core.knowledge.schemas import Document, DocumentUpdate
 from app.shared.schemas import GapReport
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
+
+
+@router.get("", response_model=list[Document])
+async def list_published_documents(
+    actor: CurrentIdentity,
+    session: DbSession,
+    source: str | None = None,
+    updated_since: datetime | None = None,
+) -> list[Document]:
+    """Browse published, already-ingested knowledge (`source="github"`/
+    `"slack"`/`"manual"`/...) -- see `knowledge_service.list_published_
+    documents`'s docstring for why this has no `knowledge:review` gate,
+    unlike `/proposed` below.
+    """
+    return await knowledge_service.list_published_documents(
+        session, actor, actor.organization_id, source=source, updated_since=updated_since
+    )
 
 
 @router.get("/proposed", response_model=list[Document])

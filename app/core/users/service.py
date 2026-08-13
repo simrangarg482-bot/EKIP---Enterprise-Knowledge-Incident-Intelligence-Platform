@@ -45,7 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.core.users import repository
-from app.core.users.schemas import UserProfile
+from app.core.users.schemas import UserCredentialLookup, UserProfile
 from app.database.session import set_tenant_context
 from app.shared.config.logging import get_logger
 from app.shared.schemas import ActorKind, Identity
@@ -266,6 +266,61 @@ def require_permission(
             error_code="permission_denied",
             detail={"required_permission": permission_code},
         )
+
+
+async def get_credential_lookup(session: AsyncSession, email: str) -> UserCredentialLookup | None:
+    """Look up `email`'s local password credential, or `None` if no user
+    with that email exists at all. See `UserCredentialLookup`'s own
+    docstring for why this returns a narrow schema, not a `User` row.
+    """
+    row = await repository.get_by_email(session, email)
+    if row is None:
+        return None
+    return UserCredentialLookup(
+        user_id=row.id, password_hash=row.password_hash, is_active=row.is_active
+    )
+
+
+async def set_password(session: AsyncSession, *, user_id: uuid.UUID, password_hash: str) -> None:
+    """Set `user_id`'s local password credential (already hashed by the
+    caller -- `core/users` has no opinion on the hashing scheme, that's
+    `core.auth.service`'s job). Only called from `core.auth.service.signup`,
+    which needs `users` written without reaching into its table directly
+    (see `repository.update_password_hash`'s own docstring).
+    """
+    await repository.update_password_hash(session, user_id=user_id, password_hash=password_hash)
+
+
+async def resolve_organization_for_login(session: AsyncSession, user_id: uuid.UUID) -> uuid.UUID | None:
+    """Resolve which organization a password-authenticated `user_id` should
+    log into -- `None` if they hold no role assignment anywhere (shouldn't
+    happen for a `signup`-created account, but not assumed away). See
+    `repository.get_first_organization_id`'s docstring for the current
+    one-organization-per-password-account scope this reflects.
+    """
+    return await repository.get_first_organization_id(session, user_id)
+
+
+_ADMIN_ROLE_NAME = "admin"
+
+
+async def ensure_admin_role(session: AsyncSession) -> uuid.UUID:
+    """Fetch-or-create the platform's `"admin"` role, granting it every
+    permission code `repository.ADMIN_PERMISSION_CODES` lists, and return its
+    id.
+
+    Idempotent -- safe to call on every signup, not just the first ever. This
+    is the same bootstrap `scripts/seed_test_organization.py`'s dev-only
+    script has always performed by hand; extracted here so real signup
+    (`core.auth.service.signup`) grants a newly-created organization's first
+    user the same working permission set without duplicating that logic.
+    """
+    permissions = await repository.get_or_create_permissions(session, repository.ADMIN_PERMISSION_CODES)
+    role = await repository.get_or_create_role_by_name(
+        session, _ADMIN_ROLE_NAME, description="Full-access role granted to an organization's first user."
+    )
+    await repository.grant_permissions_to_role(session, role_id=role.id, permissions=permissions)
+    return role.id
 
 
 def require_project_permission(

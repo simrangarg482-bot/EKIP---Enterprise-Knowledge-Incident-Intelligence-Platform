@@ -50,6 +50,25 @@ initially-`None` callable of a third-party-only shape (`AsyncSession`,
 `scripts/run_mcp_server.py` to the real `app.database.session.
 set_tenant_context`, and read by `run_mcp_tool` at call time the same way.
 
+**OAuth (2026-08-12 addition, see `app.mcp.oauth.provider`'s module docstring
+for the full why):** Claude's "Add custom connector" UI requires either OAuth
+or a still-beta-gated static-header field to authenticate a remote MCP
+server -- there is no other way to hand it EKIP's existing bearer-token
+scheme. `auth_server_provider=EkipOAuthProvider()` and `auth=AuthSettings(...)`
+below turn this `MCPServer` into a real OAuth 2.1 authorization server (per
+the MCP Authorization spec: RFC 8414/9728/7591/7636 metadata, dynamic client
+registration, PKCE) whose `/authorize` and `/token` endpoints are a thin
+front door onto the exact same `core.auth.service` token issuance every
+other path already trusts -- see that module for what is and is not new
+here. `issuer_url`/`resource_server_url` must be set to this server's real,
+publicly-reachable HTTPS base URL (`Settings.mcp_public_base_url`,
+`MCP_PUBLIC_BASE_URL` env var) -- `localhost` cannot work here, since
+Claude's OAuth discovery calls happen from Anthropic's cloud, not this
+machine. `extract_bearer_token`/`app.mcp.auth.resolve_mcp_identity`/
+`app.mcp.dispatch.run_mcp_tool` below are unchanged: this is an additional
+front-door auth layer, not a replacement for the real identity/RLS
+resolution every tool call still runs.
+
 **Verified against the actually-installed `mcp` package (2026-08-06).** The
 pinned `mcp>=1.0` requirement turned out to be stale: the environment this
 project actually runs in has `mcp==2.0.0` installed, which is a genuine
@@ -77,12 +96,30 @@ import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.mcpserver import Context, MCPServer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import PermissionDeniedError
+from app.mcp.oauth.provider import EkipOAuthProvider, register_authorization_confirmation_route
+from app.shared.config.settings import get_settings
 
-mcp_server = MCPServer(name="ekip")
+_oauth_provider = EkipOAuthProvider()
+_public_base_url = get_settings().mcp_public_base_url
+
+mcp_server = MCPServer(
+    name="ekip",
+    auth_server_provider=_oauth_provider,
+    auth=AuthSettings(
+        issuer_url=_public_base_url,
+        resource_server_url=_public_base_url,
+        client_registration_options=ClientRegistrationOptions(
+            enabled=True, valid_scopes=["ekip"], default_scopes=["ekip"]
+        ),
+        revocation_options=RevocationOptions(enabled=True),
+    ),
+)
+register_authorization_confirmation_route(mcp_server, _oauth_provider)
 
 # Set once, at process startup, by `scripts/run_mcp_server.py` -- see this
 # module's docstring. Left `None` until then so an accidental tool call

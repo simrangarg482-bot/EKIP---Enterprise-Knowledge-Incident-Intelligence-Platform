@@ -117,6 +117,40 @@ async def list_proposed_documents(
     return result.scalars().all()
 
 
+async def list_published_documents(
+    session: AsyncSession,
+    organization_id: uuid.UUID,
+    *,
+    source: str | None = None,
+    updated_since: datetime | None = None,
+) -> Sequence[Document]:
+    """Return every non-deleted, published document for `organization_id`,
+    newest-updated first (`GET /knowledge` -- "browse ingested GitHub/Slack
+    data"), optionally narrowed to one connector `source` ("github"/"slack"/
+    "manual"/...) and/or documents touched since `updated_since`.
+
+    Published-only, unlike `list_proposed_documents`: mirrors `service.
+    get_document`'s existing rule that a published document is readable by
+    anyone in the organization, with no `knowledge:review` gate -- this is a
+    browsing surface for already-approved content, not the review queue.
+    """
+    stmt = (
+        select(Document)
+        .where(
+            Document.organization_id == organization_id,
+            Document.status == "published",
+            Document.deleted_at.is_(None),
+        )
+        .order_by(Document.updated_at.desc())
+    )
+    if source is not None:
+        stmt = stmt.where(Document.source == source)
+    if updated_since is not None:
+        stmt = stmt.where(Document.updated_at >= updated_since)
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
 async def update_document_status(
     session: AsyncSession, document_id: uuid.UUID, *, status: str
 ) -> Document | None:

@@ -26,9 +26,11 @@ from app.api.deps import CurrentIdentity, DbSession
 from app.core.audit.service import record_audit_event
 from app.core.auth import service as auth_service
 from app.core.auth.schemas import (
+    LoginRequest,
     LogoutAllResponse,
     RefreshRequest,
     SessionTokens,
+    SignupRequest,
     SSOAuthorizationRedirect,
     SSOCallbackRequest,
 )
@@ -58,6 +60,22 @@ async def complete_login(
     used in `begin_login`, per the OAuth2 spec.
     """
     return await auth_service.complete_sso_login(session, data, redirect_uri=redirect_uri)
+
+
+@router.post("/signup", response_model=SessionTokens, status_code=status.HTTP_201_CREATED)
+async def signup(data: SignupRequest, session: DbSession) -> SessionTokens:
+    """Self-service email/password account creation -- a parallel path
+    alongside the SSO flow above, not a replacement for it. See
+    `auth_service.signup`'s docstring for exactly what it does and does not
+    support (always a brand-new organization; no join-existing-org flow).
+    """
+    return await auth_service.signup(session, data)
+
+
+@router.post("/login", response_model=SessionTokens)
+async def login(data: LoginRequest, session: DbSession) -> SessionTokens:
+    """Email/password login, counterpart to `signup`."""
+    return await auth_service.login_with_password(session, data)
 
 
 @router.post("/refresh", response_model=SessionTokens)

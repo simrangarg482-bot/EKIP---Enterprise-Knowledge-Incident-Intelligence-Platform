@@ -73,6 +73,7 @@ class AgentExecution(Base):
     __table_args__ = (
         Index("ix_agent_executions_agent_name_started_at", "agent_name", "started_at"),
         Index("ix_agent_executions_org_started_at", "organization_id", "started_at"),
+        Index("ix_agent_executions_user_started_at", "user_id", "started_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -80,6 +81,17 @@ class AgentExecution(Base):
     )
     organization_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: The human user who triggered this execution over REST, if any --
+    #: `NULL` for MCP/scheduled executions and for any execution that predates
+    #: this column. Added so a per-user "question history" view (the
+    #: frontend's `GET /ask/history`) can filter this same table rather than
+    #: needing a second, duplicate log of what a human actually asked.
+    #: `ondelete="SET NULL"`, not `RESTRICT` like `organization_id` above:
+    #: deleting a user account must never be blocked by their own old
+    #: execution history, the same reasoning `RefreshToken`'s FKs already use.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     agent_name: Mapped[str] = mapped_column(Text, nullable=False)
     trigger_source: Mapped[str] = mapped_column(Text, nullable=False)  # mcp/core_api/scheduled

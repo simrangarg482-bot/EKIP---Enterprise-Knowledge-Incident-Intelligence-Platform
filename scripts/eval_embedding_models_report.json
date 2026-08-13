@@ -1,0 +1,1205 @@
+{
+  "generated_at": "2026-08-13T07:12:39.650323+00:00",
+  "organization": {
+    "slug": "test-org",
+    "name": "Test Org"
+  },
+  "top_k": 5,
+  "corpus_chunk_count": 93,
+  "question_count": 36,
+  "models": {
+    "current": "current: sentence-transformers/all-MiniLM-L6-v2 (384-dim, ENGINEERING_DECISIONS.md #006)",
+    "candidate": "candidate: BAAI/bge-base-en-v1.5 (768-dim)"
+  },
+  "aggregates": {
+    "current": {
+      "recall_at_k": 0.8846153846153846,
+      "recall_at_k_by_category": {
+        "clear-answer": 0.8571428571428571,
+        "ambiguous": 0.9166666666666666
+      },
+      "grounded_rate_by_category": {
+        "clear-answer": 0.8571428571428571,
+        "ambiguous": 0.25,
+        "no-information": 0.0
+      },
+      "headline_grounding_rate": 0.8571428571428571
+    },
+    "candidate": {
+      "recall_at_k": 0.8846153846153846,
+      "recall_at_k_by_category": {
+        "clear-answer": 0.8571428571428571,
+        "ambiguous": 0.9166666666666666
+      },
+      "grounded_rate_by_category": {
+        "clear-answer": 0.8571428571428571,
+        "ambiguous": 0.25,
+        "no-information": 0.0
+      },
+      "headline_grounding_rate": 0.8571428571428571
+    }
+  },
+  "decision": {
+    "recall_delta": 0.0,
+    "grounding_delta": 0.0,
+    "candidate_wins_meaningfully": false
+  },
+  "per_question_results": {
+    "current": [
+      {
+        "id": "sso-login-failure",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 0.5,
+        "answer": "Users were unable to log in through Google Workspace SSO due to an incorrect OIDC callback URL in the identity provider configuration [1]. The issue was fixed by updating the redirect URI configuration [1].",
+        "top_chunks": [
+          "[conversations] f8751d4a-f345-431a-aa0a-06057c6cce0e",
+          "[documentation] Google Workspace SSO login failing",
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[documentation] Security alert: suspicious login attempts detected",
+          "[conversations] b8fa3138-2add-4b13-92c8-2fb0b150ebb7"
+        ]
+      },
+      {
+        "id": "embedding-worker-memory",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The application containers restarted due to excessive memory consumption by the document embedding workers [2]. The configuration change that resolved the issue was reducing the worker concurrency from 10 to 4 [1][2].",
+        "top_chunks": [
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[documentation] Embedding workers causing high memory usage",
+          "[conversations] b6889c33-19ec-4f98-9d21-a06a4c5dff40",
+          "[documentation] Added Dev Container Folder",
+          "[documentation] Defer model/tokenizer loading with caching to fix startup cr"
+        ]
+      },
+      {
+        "id": "incidents-api-500",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The incidents API returns an HTTP 500 error when filtering by date range because the query builder was generating invalid SQL for empty date filters [2].",
+        "top_chunks": [
+          "[documentation] Incident API returns HTTP 500 error",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[conversations] 50fd078a-65cb-4008-843b-daea6c7ef238",
+          "[conversations] 6add1e88-4b5c-4ef8-8584-ee7918aefc50",
+          "[conversations] 14ef5d56-745b-4a32-8dfd-0b48eaaa4f13"
+        ]
+      },
+      {
+        "id": "brute-force-login",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 0.6666666666666666,
+        "answer": "During the suspicious login attempts incident, multiple failed authentication attempts were detected, which originated from an unknown IP address and were identified as a possible brute force attack [2]. As a mitigation, the account was temporarily locked after 10 failed attempts, and additional rate limiting was added to the authentication endpoint [1][2]. The incident was closed, and no customer data was exposed [1].",
+        "top_chunks": [
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[documentation] Security alert: suspicious login attempts detected",
+          "[conversations] aaa7643a-df20-4840-bb22-ad45a541cff9",
+          "[conversations] 14ef5d56-745b-4a32-8dfd-0b48eaaa4f13",
+          "[documentation] test: verify Claude GitHub access (round 2)"
+        ]
+      },
+      {
+        "id": "alembic-lock-timeout",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The Alembic database migration failed with a lock timeout because it was modifying a large table during a high traffic period [1][3]. The recommended solution was to run migrations during maintenance windows and use batch operations [1].",
+        "top_chunks": [
+          "[documentation] Alembic migration failing with lock timeout",
+          "[conversations] faca3e18-03b1-4b59-82c8-d3d1be45bd45",
+          "[conversations] b945ac8c-3e9f-4e05-8fdc-a0ccdf31c025",
+          "[conversations] 74ffbfde-a4c0-4d4f-8e4e-c280c2e765db",
+          "[conversations] 94d79744-5c2c-4c73-b6c7-d14fceafccb3"
+        ]
+      },
+      {
+        "id": "api-latency-analytics",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The API latency increase after the analytics deployment was caused by an inefficient database query introduced in the analytics service due to a missing database index on the user_activity table [2][3]. It was resolved by adding a database index migration [2].",
+        "top_chunks": [
+          "[conversations] 6add1e88-4b5c-4ef8-8584-ee7918aefc50",
+          "[documentation] API latency increased after analytics deployment",
+          "[conversations] 3005267b-9254-420a-8b9e-b6e76f2cdb4b",
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[conversations] 50fd078a-65cb-4008-843b-daea6c7ef238"
+        ]
+      },
+      {
+        "id": "rag-retrieval-quality",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The changes made to improve retrieval accuracy when the RAG system was returning irrelevant documents include reducing chunk size, adding metadata filtering, and adding cross encoder reranking [1][2].",
+        "top_chunks": [
+          "[documentation] RAG retrieval returning irrelevant answers",
+          "[conversations] 8f97301d-e65e-4759-a97b-84343933f293",
+          "[conversations] e9538323-0706-44d1-b66d-04d1434b2f06",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831"
+        ]
+      },
+      {
+        "id": "checkout-500-runbook",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The payment adapter for null handling should be checked first when checkout returns a 500 error [1].",
+        "top_chunks": [
+          "[documentation] Checkout 500 runbook",
+          "[conversations] 50fd078a-65cb-4008-843b-daea6c7ef238",
+          "[documentation] Test: Claude GitHub access (round 4)",
+          "[documentation] test: verify Claude GitHub access (round 4)",
+          "[documentation] Test: Claude GitHub access (round 3)"
+        ]
+      },
+      {
+        "id": "deployment-version",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "Version 2.4.0 was deployed to production when the API latency problem began [2].",
+        "top_chunks": [
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[documentation] API latency increased after analytics deployment",
+          "[conversations] 6add1e88-4b5c-4ef8-8584-ee7918aefc50",
+          "[conversations] 3005267b-9254-420a-8b9e-b6e76f2cdb4b",
+          "[conversations] bc65f581-7b8f-4b97-9bae-11eec403e0e0"
+        ]
+      },
+      {
+        "id": "code-patch-config-purpose",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 0.6666666666666666,
+        "answer": "The `patch_config` function in `app.py` recursively modifies a model configuration dictionary to fix version incompatibilities [2]. It specifically checks for keys related to the `InputLayer` and updates the `batch_shape` key to `batch_input_shape`, while also removing optional and quantization configuration keys [2]. This function is needed to ensure that the model configuration is compatible with the current version being used, which may have different requirements for these keys [2].",
+        "top_chunks": [
+          "[documentation] .gitignore",
+          "[code] app.py",
+          "[code] app.py",
+          "[documentation] Remove Python version lock, update requirements for compatib",
+          "[documentation] Update requirements for Python 3.13 compatibility"
+        ]
+      },
+      {
+        "id": "code-sample-with-temperature",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The sample_with_temperature function picks the next predicted token by first applying a logarithmic transformation to the predicted probabilities, adjusted by the temperature parameter, and then exponentiating the result to obtain a probability distribution. It then normalizes this distribution and selects the top_k indices with the highest probabilities. Finally, it randomly chooses one of these top indices based on their probabilities [2].",
+        "top_chunks": [
+          "[code] app.py",
+          "[code] app.py",
+          "[documentation] .gitignore",
+          "[code] app.py",
+          "[documentation] runtime.txt"
+        ]
+      },
+      {
+        "id": "code-keras-mismatch-commit",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The fix committed for the Keras version mismatch in app.py was called FixedInputLayer [1].",
+        "top_chunks": [
+          "[code] Fix: Add FixedInputLayer to handle Keras version mismatch in",
+          "[documentation] Fix: Upgrade TensorFlow and Keras to support modern model fo",
+          "[code] app.py",
+          "[documentation] Merge pull request #2 from sarthakkaushik927/main",
+          "[documentation] Fix: pin Python 3.11.9 and compatible package versions for R"
+        ]
+      },
+      {
+        "id": "test1-docs-restructure",
+        "category": "clear-answer",
+        "recall_hit": false,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] docs: improve test-1 developer experience",
+          "[documentation] Improve test-1 documentation and developer experience",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] Improve repository documentation and developer experience",
+          "[documentation] docs: improve repository documentation and developer experie"
+        ]
+      },
+      {
+        "id": "readme-project-name",
+        "category": "clear-answer",
+        "recall_hit": false,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] Improve repository documentation and developer experience",
+          "[documentation] Add a CONTRIBUTING guide",
+          "[documentation] test: verify Claude GitHub access (round 3)",
+          "[documentation] test: verify Claude GitHub access (round 4)"
+        ]
+      },
+      {
+        "id": "python-version-conflict",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The project requires Python version 3.11.9 [1].",
+        "top_chunks": [
+          "[documentation] runtime.txt",
+          "[documentation] Update requirements for Python 3.13 compatibility",
+          "[documentation] Remove Python version lock, update requirements for compatib",
+          "[documentation] Lock Python 3.10.13 with compatible requirements",
+          "[documentation] render.yaml"
+        ]
+      },
+      {
+        "id": "tensorflow-keras-upgrade-reason",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "TensorFlow and Keras were upgraded to support the modern model format to address compatibility issues with newer model configurations, specifically to handle Keras version mismatches and ensure that the models can be loaded and used correctly [1][3].",
+        "top_chunks": [
+          "[documentation] Fix: Upgrade TensorFlow and Keras to support modern model fo",
+          "[code] app.py",
+          "[code] Fix: Add FixedInputLayer to handle Keras version mismatch in",
+          "[documentation] requirements.txt",
+          "[documentation] Update requirements for Python 3.13 compatibility"
+        ]
+      },
+      {
+        "id": "render-build-command-fix",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Fix buildCommand with && operator for Render",
+          "[documentation] Fix render.yaml buildCommand for Render deployment",
+          "[documentation] Fix/render deployment",
+          "[documentation] Fix: pin Python 3.11.9 and compatible package versions for R",
+          "[documentation] Merge pull request #2 from sarthakkaushik927/main"
+        ]
+      },
+      {
+        "id": "force-python311-reason",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The project forced Python 3.11 and removed pyproject.toml to ensure compatibility and possibly simplify the configuration [1].",
+        "top_chunks": [
+          "[documentation] Force Python 3.11: Add .python-version and remove pyproject.",
+          "[documentation] Add pyproject.toml, remove runtime.txt for Render compatibil",
+          "[documentation] runtime.txt",
+          "[documentation] Fix: pin Python 3.11.9 and compatible package versions for R",
+          "[documentation] Remove Python version lock, update requirements for compatib"
+        ]
+      },
+      {
+        "id": "startup-crash-root-cause",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Defer model/tokenizer loading with caching to fix startup cr",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[conversations] b6889c33-19ec-4f98-9d21-a06a4c5dff40",
+          "[documentation] Embedding workers causing high memory usage",
+          "[documentation] .gitignore"
+        ]
+      },
+      {
+        "id": "rag-chunk-size-exact-value",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] RAG retrieval returning irrelevant answers",
+          "[conversations] 8f97301d-e65e-4759-a97b-84343933f293",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[conversations] 50fd078a-65cb-4008-843b-daea6c7ef238"
+        ]
+      },
+      {
+        "id": "alembic-exact-maintenance-window",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Alembic migration failing with lock timeout",
+          "[conversations] faca3e18-03b1-4b59-82c8-d3d1be45bd45",
+          "[conversations] 74ffbfde-a4c0-4d4f-8e4e-c280c2e765db",
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31",
+          "[conversations] b945ac8c-3e9f-4e05-8fdc-a0ccdf31c025"
+        ]
+      },
+      {
+        "id": "brute-force-source-ip",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[documentation] Security alert: suspicious login attempts detected",
+          "[documentation] test: verify Claude GitHub access (round 4)",
+          "[documentation] test: verify Claude GitHub access (round 2)",
+          "[documentation] test: verify Claude GitHub access (round 3)"
+        ]
+      },
+      {
+        "id": "embedding-worker-exact-memory-gb",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Embedding workers causing high memory usage",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[documentation] RAG retrieval returning irrelevant answers",
+          "[conversations] b6889c33-19ec-4f98-9d21-a06a4c5dff40",
+          "[documentation] Defer model/tokenizer loading with caching to fix startup cr"
+        ]
+      },
+      {
+        "id": "checkout-runbook-secondary-step",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Checkout 500 runbook",
+          "[documentation] chore: initial commit",
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[conversations] 14ef5d56-745b-4a32-8dfd-0b48eaaa4f13",
+          "[documentation] Security alert: suspicious login attempts detected"
+        ]
+      },
+      {
+        "id": "sso-doc-location-and-owner",
+        "category": "ambiguous",
+        "recall_hit": false,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] docs: add CONTRIBUTING guide and CHANGELOG",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] Improve repository documentation and developer experience",
+          "[documentation] Add a CONTRIBUTING guide",
+          "[documentation] docs: add CONTRIBUTING guide and CHANGELOG"
+        ]
+      },
+      {
+        "id": "incidents-api-fix-deployed-when",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Incident API returns HTTP 500 error",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[conversations] bc65f581-7b8f-4b97-9bae-11eec403e0e0",
+          "[conversations] 14ef5d56-745b-4a32-8dfd-0b48eaaa4f13",
+          "[conversations] 15b911c2-b223-42bd-8be1-9167e9eb5f5c"
+        ]
+      },
+      {
+        "id": "neg-parental-leave",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 5dd56ede-3ed5-4f99-8668-8c7e0064c382",
+          "[conversations] bc65f581-7b8f-4b97-9bae-11eec403e0e0",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] docs: add CONTRIBUTING guide and CHANGELOG",
+          "[documentation] chore: initial commit"
+        ]
+      },
+      {
+        "id": "neg-world-cup",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[code] app.py",
+          "[documentation] README.md",
+          "[documentation] Merge branch 'main' of https://github.com/simrangarg482-bot/",
+          "[documentation] test: verify Claude GitHub access (round 4)",
+          "[conversations] aaa7643a-df20-4840-bb22-ad45a541cff9"
+        ]
+      },
+      {
+        "id": "neg-k8s-autoscaling",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[documentation] Embedding workers causing high memory usage",
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31",
+          "[documentation] requirements.txt"
+        ]
+      },
+      {
+        "id": "neg-aws-spend",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[documentation] API latency increased after analytics deployment",
+          "[conversations] 5dd56ede-3ed5-4f99-8668-8c7e0064c382",
+          "[conversations] bc65f581-7b8f-4b97-9bae-11eec403e0e0",
+          "[conversations] 6add1e88-4b5c-4ef8-8584-ee7918aefc50"
+        ]
+      },
+      {
+        "id": "neg-database-vendor-pricing",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 3005267b-9254-420a-8b9e-b6e76f2cdb4b",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[conversations] faca3e18-03b1-4b59-82c8-d3d1be45bd45",
+          "[documentation] API latency increased after analytics deployment",
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c"
+        ]
+      },
+      {
+        "id": "neg-oncall-rotation",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 66566d39-878f-4c0a-ad36-a9c6f6aa7137",
+          "[conversations] aa0b9f20-62f3-4493-ab19-e5a03540ccd9",
+          "[conversations] 5dd56ede-3ed5-4f99-8668-8c7e0064c382",
+          "[documentation] Merge branch 'main' of https://github.com/simrangarg482-bot/",
+          "[documentation] working"
+        ]
+      },
+      {
+        "id": "neg-competitor-analysis",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[documentation] Improve repository documentation and developer experience",
+          "[conversations] 5dd56ede-3ed5-4f99-8668-8c7e0064c382",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31"
+        ]
+      },
+      {
+        "id": "neg-legal-contract-terms",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31",
+          "[conversations] 94d79744-5c2c-4c73-b6c7-d14fceafccb3",
+          "[conversations] 5dd56ede-3ed5-4f99-8668-8c7e0064c382",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[conversations] faca3e18-03b1-4b59-82c8-d3d1be45bd45"
+        ]
+      },
+      {
+        "id": "neg-marketing-campaign-ctr",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[conversations] 3005267b-9254-420a-8b9e-b6e76f2cdb4b",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[conversations] e9538323-0706-44d1-b66d-04d1434b2f06",
+          "[documentation] API latency increased after analytics deployment"
+        ]
+      },
+      {
+        "id": "neg-team-headcount",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31",
+          "[documentation] Improve repository documentation and developer experience",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[conversations] 66566d39-878f-4c0a-ad36-a9c6f6aa7137",
+          "[conversations] aa0b9f20-62f3-4493-ab19-e5a03540ccd9"
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "id": "sso-login-failure",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 0.5,
+        "answer": "Users were unable to log in through Google Workspace SSO due to an incorrect redirect URI configured in the identity provider [1]. The issue was fixed by updating the OIDC configuration [1].",
+        "top_chunks": [
+          "[documentation] Google Workspace SSO login failing",
+          "[conversations] f8751d4a-f345-431a-aa0a-06057c6cce0e",
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[documentation] Security alert: suspicious login attempts detected",
+          "[conversations] b8fa3138-2add-4b13-92c8-2fb0b150ebb7"
+        ]
+      },
+      {
+        "id": "embedding-worker-memory",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The application containers restarted due to excessive memory consumption by the document embedding workers, which was caused by having too many parallel embedding workers [2]. The configuration change that resolved the issue was reducing the worker concurrency from 10 to 4 [1][2].",
+        "top_chunks": [
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[documentation] Embedding workers causing high memory usage",
+          "[conversations] b6889c33-19ec-4f98-9d21-a06a4c5dff40",
+          "[documentation] Defer model/tokenizer loading with caching to fix startup cr",
+          "[code] app.py"
+        ]
+      },
+      {
+        "id": "incidents-api-500",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The incidents API returns an HTTP 500 error when filtering by date range because the query builder was generating invalid SQL for empty date filters [2].",
+        "top_chunks": [
+          "[documentation] Incident API returns HTTP 500 error",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[conversations] 50fd078a-65cb-4008-843b-daea6c7ef238",
+          "[conversations] aaa7643a-df20-4840-bb22-ad45a541cff9",
+          "[documentation] Security alert: suspicious login attempts detected"
+        ]
+      },
+      {
+        "id": "brute-force-login",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "Multiple failed authentication attempts were detected, originating from an unknown IP address, which resulted in one user account being temporarily locked due to a possible brute force attack [1][2]. To mitigate this, stricter rate limiting was added to the authentication endpoint [1][2].",
+        "top_chunks": [
+          "[documentation] Security alert: suspicious login attempts detected",
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[documentation] Incident API returns HTTP 500 error",
+          "[conversations] 14ef5d56-745b-4a32-8dfd-0b48eaaa4f13",
+          "[conversations] aaa7643a-df20-4840-bb22-ad45a541cff9"
+        ]
+      },
+      {
+        "id": "alembic-lock-timeout",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The Alembic database migration failed with a lock timeout because it was modifying a large table during a high traffic period [1][2]. The recommended solution was to run migrations during maintenance windows and use batch operations [1][2].",
+        "top_chunks": [
+          "[documentation] Alembic migration failing with lock timeout",
+          "[conversations] b945ac8c-3e9f-4e05-8fdc-a0ccdf31c025",
+          "[conversations] 94d79744-5c2c-4c73-b6c7-d14fceafccb3",
+          "[conversations] faca3e18-03b1-4b59-82c8-d3d1be45bd45",
+          "[conversations] 74ffbfde-a4c0-4d4f-8e4e-c280c2e765db"
+        ]
+      },
+      {
+        "id": "api-latency-analytics",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The API latency increase after the analytics deployment was caused by an inefficient database query introduced by the analytics service, specifically due to a missing database index on the user_activity table [1][4]. It was resolved by adding a database index migration [1].",
+        "top_chunks": [
+          "[documentation] API latency increased after analytics deployment",
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[conversations] 6add1e88-4b5c-4ef8-8584-ee7918aefc50",
+          "[conversations] 3005267b-9254-420a-8b9e-b6e76f2cdb4b",
+          "[conversations] 74ffbfde-a4c0-4d4f-8e4e-c280c2e765db"
+        ]
+      },
+      {
+        "id": "rag-retrieval-quality",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The changes made to improve retrieval accuracy when the RAG system was returning irrelevant documents include reducing chunk size, adding metadata filtering, and adding cross encoder reranking [2].",
+        "top_chunks": [
+          "[conversations] 8f97301d-e65e-4759-a97b-84343933f293",
+          "[documentation] RAG retrieval returning irrelevant answers",
+          "[documentation] Improve repository documentation and developer experience",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] docs: improve repository documentation and developer experie"
+        ]
+      },
+      {
+        "id": "checkout-500-runbook",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The payment adapter for null handling should be checked first when checkout returns a 500 error [1].",
+        "top_chunks": [
+          "[documentation] Checkout 500 runbook",
+          "[conversations] 50fd078a-65cb-4008-843b-daea6c7ef238",
+          "[documentation] Incident API returns HTTP 500 error",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[conversations] b6889c33-19ec-4f98-9d21-a06a4c5dff40"
+        ]
+      },
+      {
+        "id": "deployment-version",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "Version 2.4.0 was deployed to production when the API latency problem began [4].",
+        "top_chunks": [
+          "[documentation] API latency increased after analytics deployment",
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[conversations] 3005267b-9254-420a-8b9e-b6e76f2cdb4b",
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31",
+          "[conversations] 6add1e88-4b5c-4ef8-8584-ee7918aefc50"
+        ]
+      },
+      {
+        "id": "code-patch-config-purpose",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The `patch_config` function in `app.py` recursively modifies a model configuration dictionary to fix version incompatibilities related to Keras. It specifically addresses issues where the newer Keras versions save 'batch_shape' and 'optional' keys, which older versions do not understand. The function replaces 'batch_shape' with 'batch_input_shape' and removes the 'optional' and 'quantization_config' keys to ensure compatibility with older Keras versions [1][4].",
+        "top_chunks": [
+          "[code] app.py",
+          "[code] Fix: Add FixedInputLayer to handle Keras version mismatch in",
+          "[documentation] .gitignore",
+          "[code] app.py",
+          "[documentation] .gitignore"
+        ]
+      },
+      {
+        "id": "code-sample-with-temperature",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 0.6666666666666666,
+        "answer": "The `sample_with_temperature` function picks the next predicted token by first applying a temperature scaling to the predicted probabilities, which involves taking the logarithm of the predictions, dividing by the temperature, and then exponentiating the result [1]. It then normalizes these exponentiated probabilities to sum to one [1]. Finally, it selects a token index from the top-k indices based on the adjusted probabilities using a random choice weighted by these probabilities [1].",
+        "top_chunks": [
+          "[code] app.py",
+          "[code] app.py",
+          "[code] app.py",
+          "[documentation] render.yaml",
+          "[code] app.py"
+        ]
+      },
+      {
+        "id": "code-keras-mismatch-commit",
+        "category": "clear-answer",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The fix committed for the Keras version mismatch in app.py was called FixedInputLayer [1].",
+        "top_chunks": [
+          "[code] Fix: Add FixedInputLayer to handle Keras version mismatch in",
+          "[documentation] Fix: Upgrade TensorFlow and Keras to support modern model fo",
+          "[documentation] requirements.txt",
+          "[documentation] Fix: pin Python 3.11.9 and compatible package versions for R",
+          "[documentation] Fix: pin Python 3.11.9 and compatible package versions for R"
+        ]
+      },
+      {
+        "id": "test1-docs-restructure",
+        "category": "clear-answer",
+        "recall_hit": false,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] docs: improve test-1 developer experience",
+          "[documentation] Improve test-1 documentation and developer experience",
+          "[documentation] Improve repository documentation and developer experience",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] docs: improve repository documentation and developer experie"
+        ]
+      },
+      {
+        "id": "readme-project-name",
+        "category": "clear-answer",
+        "recall_hit": false,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] docs: improve test-1 developer experience",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] Improve repository documentation and developer experience",
+          "[documentation] Test: Claude GitHub access (round 4)",
+          "[documentation] Improve test-1 documentation and developer experience"
+        ]
+      },
+      {
+        "id": "python-version-conflict",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The project requires Python 3.11 [2].",
+        "top_chunks": [
+          "[documentation] Update requirements for Python 3.13 compatibility",
+          "[documentation] Force Python 3.11: Add .python-version and remove pyproject.",
+          "[documentation] .devcontainer/devcontainer.json",
+          "[documentation] Remove Python version lock, update requirements for compatib",
+          "[documentation] Fix: pin Python 3.11.9 and compatible package versions for R"
+        ]
+      },
+      {
+        "id": "tensorflow-keras-upgrade-reason",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "TensorFlow and Keras were upgraded to support the modern model format to address compatibility issues with newer features, such as the 'batch_shape' and 'optional' attributes in the InputLayer, which older versions do not understand [1].",
+        "top_chunks": [
+          "[documentation] Fix: Upgrade TensorFlow and Keras to support modern model fo",
+          "[documentation] requirements.txt",
+          "[code] app.py",
+          "[code] Fix: Add FixedInputLayer to handle Keras version mismatch in",
+          "[documentation] Update requirements for Python 3.13 compatibility"
+        ]
+      },
+      {
+        "id": "render-build-command-fix",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Fix buildCommand with && operator for Render",
+          "[documentation] Fix render.yaml buildCommand for Render deployment",
+          "[documentation] Fix/render deployment",
+          "[documentation] Merge pull request #2 from sarthakkaushik927/main",
+          "[documentation] Add pyproject.toml, remove runtime.txt for Render compatibil"
+        ]
+      },
+      {
+        "id": "force-python311-reason",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": true,
+        "grounded": true,
+        "grounded_sentence_ratio": 1.0,
+        "answer": "The project forced Python 3.11 and removed pyproject.toml to ensure compatibility with Render [1].",
+        "top_chunks": [
+          "[documentation] Force Python 3.11: Add .python-version and remove pyproject.",
+          "[documentation] Add pyproject.toml, remove runtime.txt for Render compatibil",
+          "[documentation] runtime.txt",
+          "[documentation] Merge pull request #2 from sarthakkaushik927/main",
+          "[documentation] Fix: pin Python 3.11.9 and compatible package versions for R"
+        ]
+      },
+      {
+        "id": "startup-crash-root-cause",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Defer model/tokenizer loading with caching to fix startup cr",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[conversations] b6889c33-19ec-4f98-9d21-a06a4c5dff40",
+          "[code] app.py",
+          "[documentation] .gitignore"
+        ]
+      },
+      {
+        "id": "rag-chunk-size-exact-value",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] RAG retrieval returning irrelevant answers",
+          "[conversations] 8f97301d-e65e-4759-a97b-84343933f293",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[documentation] Merge pull request #2 from sarthakkaushik927/main",
+          "[documentation] requirements.txt"
+        ]
+      },
+      {
+        "id": "alembic-exact-maintenance-window",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Alembic migration failing with lock timeout",
+          "[conversations] faca3e18-03b1-4b59-82c8-d3d1be45bd45",
+          "[conversations] 94d79744-5c2c-4c73-b6c7-d14fceafccb3",
+          "[conversations] 74ffbfde-a4c0-4d4f-8e4e-c280c2e765db",
+          "[conversations] b945ac8c-3e9f-4e05-8fdc-a0ccdf31c025"
+        ]
+      },
+      {
+        "id": "brute-force-source-ip",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[documentation] Security alert: suspicious login attempts detected",
+          "[documentation] Google Workspace SSO login failing",
+          "[conversations] f8751d4a-f345-431a-aa0a-06057c6cce0e",
+          "[documentation] test: verify Claude GitHub access (round 4)"
+        ]
+      },
+      {
+        "id": "embedding-worker-exact-memory-gb",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Embedding workers causing high memory usage",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[documentation] Defer model/tokenizer loading with caching to fix startup cr",
+          "[documentation] RAG retrieval returning irrelevant answers",
+          "[code] app.py"
+        ]
+      },
+      {
+        "id": "checkout-runbook-secondary-step",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Checkout 500 runbook",
+          "[documentation] Alembic migration failing with lock timeout",
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[documentation] Agent generated unsupported answer",
+          "[conversations] f8751d4a-f345-431a-aa0a-06057c6cce0e"
+        ]
+      },
+      {
+        "id": "sso-doc-location-and-owner",
+        "category": "ambiguous",
+        "recall_hit": false,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] f8751d4a-f345-431a-aa0a-06057c6cce0e",
+          "[documentation] Google Workspace SSO login failing",
+          "[documentation] docs: improve test-1 developer experience",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] docs: add CONTRIBUTING guide and CHANGELOG"
+        ]
+      },
+      {
+        "id": "incidents-api-fix-deployed-when",
+        "category": "ambiguous",
+        "recall_hit": true,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[documentation] Incident API returns HTTP 500 error",
+          "[conversations] aaa7643a-df20-4840-bb22-ad45a541cff9",
+          "[documentation] Fix/render deployment",
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31"
+        ]
+      },
+      {
+        "id": "neg-parental-leave",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] working",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[documentation] API latency increased after analytics deployment",
+          "[conversations] 5dd56ede-3ed5-4f99-8668-8c7e0064c382"
+        ]
+      },
+      {
+        "id": "neg-world-cup",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 14ef5d56-745b-4a32-8dfd-0b48eaaa4f13",
+          "[conversations] aaa7643a-df20-4840-bb22-ad45a541cff9",
+          "[documentation] README.md",
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31",
+          "[code] app.py"
+        ]
+      },
+      {
+        "id": "neg-k8s-autoscaling",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[documentation] Checkout 500 runbook",
+          "[documentation] API latency increased after analytics deployment",
+          "[documentation] requirements.txt",
+          "[code] app.py"
+        ]
+      },
+      {
+        "id": "neg-aws-spend",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[documentation] render.yaml",
+          "[documentation] API latency increased after analytics deployment",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[conversations] b6889c33-19ec-4f98-9d21-a06a4c5dff40"
+        ]
+      },
+      {
+        "id": "neg-database-vendor-pricing",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 3005267b-9254-420a-8b9e-b6e76f2cdb4b",
+          "[documentation] API latency increased after analytics deployment",
+          "[documentation] Alembic migration failing with lock timeout",
+          "[conversations] b8fa3138-2add-4b13-92c8-2fb0b150ebb7",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3"
+        ]
+      },
+      {
+        "id": "neg-oncall-rotation",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 5dd56ede-3ed5-4f99-8668-8c7e0064c382",
+          "[conversations] aaa7643a-df20-4840-bb22-ad45a541cff9",
+          "[conversations] 66566d39-878f-4c0a-ad36-a9c6f6aa7137",
+          "[conversations] aa0b9f20-62f3-4493-ab19-e5a03540ccd9",
+          "[documentation] README.md"
+        ]
+      },
+      {
+        "id": "neg-competitor-analysis",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] bc65f581-7b8f-4b97-9bae-11eec403e0e0",
+          "[conversations] 8f97301d-e65e-4759-a97b-84343933f293",
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[documentation] docs: improve repository documentation and developer experie",
+          "[documentation] requirements.txt"
+        ]
+      },
+      {
+        "id": "neg-legal-contract-terms",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[documentation] Alembic migration failing with lock timeout",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[conversations] 94d79744-5c2c-4c73-b6c7-d14fceafccb3",
+          "[conversations] faca3e18-03b1-4b59-82c8-d3d1be45bd45",
+          "[conversations] b945ac8c-3e9f-4e05-8fdc-a0ccdf31c025"
+        ]
+      },
+      {
+        "id": "neg-marketing-campaign-ctr",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[conversations] 3005267b-9254-420a-8b9e-b6e76f2cdb4b",
+          "[conversations] ac0befcf-8f08-4eda-a0e6-0a509f2734e3",
+          "[conversations] 5b80daa7-0930-4476-820f-6480c6bde33c",
+          "[documentation] API latency increased after analytics deployment"
+        ]
+      },
+      {
+        "id": "neg-team-headcount",
+        "category": "no-information",
+        "recall_hit": null,
+        "produced_answer": false,
+        "grounded": false,
+        "grounded_sentence_ratio": 0.0,
+        "answer": "NO_ANSWER",
+        "top_chunks": [
+          "[conversations] 0d0e89b6-d798-4b71-a6c0-380a74993e31",
+          "[conversations] 4838a1d4-c4f4-4b50-829d-0116e0505831",
+          "[conversations] 48f8b3ee-7600-4548-920d-44513d382a1c",
+          "[conversations] 50fd078a-65cb-4008-843b-daea6c7ef238",
+          "[documentation] Alembic migration failing with lock timeout"
+        ]
+      }
+    ]
+  }
+}

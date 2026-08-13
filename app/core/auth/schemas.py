@@ -32,7 +32,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SSOAuthorizationRedirect(BaseModel):
@@ -93,6 +93,29 @@ class RefreshRequest(BaseModel):
     """
 
     refresh_token: str
+
+
+class SignupRequest(BaseModel):
+    """Input to `signup` -- self-service email/password account creation.
+
+    Always creates a brand-new organization alongside the user (there is no
+    "join an existing organization via signup" flow yet -- see `signup`'s
+    own docstring); `organization_slug` follows `OrganizationCreate.slug`'s
+    exact URL-safe pattern, since it becomes that organization's real slug.
+    """
+
+    email: str
+    password: str = Field(min_length=8)
+    display_name: str
+    organization_name: str
+    organization_slug: str = Field(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$", min_length=1, max_length=63)
+
+
+class LoginRequest(BaseModel):
+    """Input to `login_with_password`."""
+
+    email: str
+    password: str
 
 
 class LogoutAllResponse(BaseModel):

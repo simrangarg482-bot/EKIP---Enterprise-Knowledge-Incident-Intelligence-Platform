@@ -458,6 +458,39 @@ async def list_connectors(
     return [ConnectorConfig.model_validate(row) for row in rows]
 
 
+async def get_connector(
+    session: AsyncSession,
+    actor: Identity,
+    organization_id: uuid.UUID,
+    connector_config_id: uuid.UUID,
+) -> ConnectorConfig:
+    """Fetch one connector configuration, enforcing the same ownership and
+    `tenancy:manage` permission check `register_connector` applies at write
+    time -- the read-then-act counterpart needed by `POST /tenancy/
+    connectors/{id}/sync` (the API layer enqueues the actual ingestion job
+    itself, via its own injected `arq` pool; this function only answers
+    "does this connector exist, belong to this organization, and may `actor`
+    act on it," the same shape `update_connector_sync_status` already
+    establishes for its own ownership check).
+    """
+    _ensure_same_organization(actor, organization_id)
+
+    row = await repository.get_connector_config_by_id(session, connector_config_id)
+    if row is None or row.organization_id != organization_id:
+        raise NotFoundError(
+            "Connector configuration not found.",
+            error_code="connector_config.not_found",
+            detail={"connector_config_id": str(connector_config_id)},
+        )
+
+    if row.project_id is not None:
+        require_project_permission(actor, row.project_id, _MANAGE_PERMISSION)
+    else:
+        require_permission(actor, _MANAGE_PERMISSION)
+
+    return ConnectorConfig.model_validate(row)
+
+
 async def update_connector_sync_status(
     session: AsyncSession,
     actor: Identity,

@@ -70,6 +70,19 @@ from app.database.session import Base
 _EMBEDDING_DIMENSION = 384  # ENGINEERING_DECISIONS.md #006
 
 
+def _base_chunk_table_args(table: str) -> tuple:
+    """The index/constraint set every `<collection>_chunks` table shares,
+    factored out of `_ChunkColumns.__table_args__` so `CodeChunk` can extend
+    it with its own `repo_full_name` index without re-declaring the shared
+    three.
+    """
+    return (
+        UniqueConstraint("document_id", "chunk_index", name=f"uq_{table}_document_chunk_index"),
+        Index(f"ix_{table}_org_project", "organization_id", "project_id"),
+        Index(f"ix_{table}_content_tsv", "content_tsv", postgresql_using="gin"),
+    )
+
+
 class _ChunkColumns:
     """Mixin: the column set, indexes, and constraint every
     `<collection>_chunks` table shares. Not a `Base` subclass itself -- each
@@ -79,14 +92,7 @@ class _ChunkColumns:
 
     @declared_attr
     def __table_args__(cls):  # noqa: N805 -- SQLAlchemy declarative convention
-        table = cls.__tablename__
-        return (
-            UniqueConstraint(
-                "document_id", "chunk_index", name=f"uq_{table}_document_chunk_index"
-            ),
-            Index(f"ix_{table}_org_project", "organization_id", "project_id"),
-            Index(f"ix_{table}_content_tsv", "content_tsv", postgresql_using="gin"),
-        )
+        return _base_chunk_table_args(cls.__tablename__)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
@@ -118,7 +124,33 @@ class _ChunkColumns:
     )
 
 
-class DocumentationChunk(_ChunkColumns, Base):
+class _RepoScopedChunkColumns(_ChunkColumns):
+    """Mixin for the two collections GitHub-sourced content actually lands
+    in (`"code"` for source files chunked by function/class boundary,
+    `"documentation"` for issues/PRs/commit messages/READMEs -- ingestion's
+    processing pipeline classifies most real GitHub connector output as
+    `ContentType == "document"`, not `"code"`, since most repos have more
+    prose than source). `ConversationChunk` (Slack/Teams) never carries a
+    GitHub repo, so it does not get this column.
+
+    Adds `repo_full_name`, denormalized from `document_metadata`'s
+    GitHub-connector-only `repo` entry at upsert time -- see
+    `UpsertChunk.repo_full_name`'s docstring. `NULL` for every
+    non-GitHub-sourced chunk (nothing else sets it).
+    """
+
+    @declared_attr
+    def __table_args__(cls):  # noqa: N805 -- SQLAlchemy declarative convention
+        table = cls.__tablename__
+        return (
+            *_base_chunk_table_args(table),
+            Index(f"ix_{table}_org_repo_full_name", "organization_id", "repo_full_name"),
+        )
+
+    repo_full_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class DocumentationChunk(_RepoScopedChunkColumns, Base):
     """Chunks classified as `ContentType == "document"` by ingestion's
     processing pipeline (long-form docs, READMEs, chunked by heading
     section) -- PROJECT_PLAN.md section 8.2's "documentation" collection.
@@ -127,7 +159,7 @@ class DocumentationChunk(_ChunkColumns, Base):
     __tablename__ = "documentation_chunks"
 
 
-class CodeChunk(_ChunkColumns, Base):
+class CodeChunk(_RepoScopedChunkColumns, Base):
     """Chunks classified as `ContentType == "code"` (chunked by
     function/class boundary) -- section 8.2's "code" collection.
     """

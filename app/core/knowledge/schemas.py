@@ -74,6 +74,8 @@ class Document(BaseModel):
     status: DocumentStatus
     version: int
     content: str | None = None
+    source: str
+    source_url: str | None = None
     source_incident_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime

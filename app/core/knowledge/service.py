@@ -104,6 +104,8 @@ async def _to_schema(session: AsyncSession, row: DocumentRow) -> Document:
         status=row.status,
         version=row.version,
         content=content,
+        source=row.source,
+        source_url=row.source_url,
         source_incident_id=uuid.UUID(source_incident_id_raw) if source_incident_id_raw else None,
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -196,6 +198,28 @@ async def list_proposed_documents(
     require_permission(actor, _REVIEW_PERMISSION)
 
     rows = await repository.list_proposed_documents(session, organization_id)
+    return [await _to_schema(session, row) for row in rows]
+
+
+async def list_published_documents(
+    session: AsyncSession,
+    actor: Identity,
+    organization_id: uuid.UUID,
+    *,
+    source: str | None = None,
+    updated_since: datetime | None = None,
+) -> list[Document]:
+    """List published documents for browsing (`GET /knowledge`) -- "browse
+    ingested GitHub/Slack data". No `knowledge:review` gate, unlike
+    `list_proposed_documents`: matches `get_document`'s existing rule that a
+    published document is readable by anyone in the organization, so this is
+    a plain org-scoped read, not a review-queue action.
+    """
+    _ensure_same_organization(actor, organization_id)
+
+    rows = await repository.list_published_documents(
+        session, organization_id, source=source, updated_since=updated_since
+    )
     return [await _to_schema(session, row) for row in rows]
 
 
